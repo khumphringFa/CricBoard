@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1830">
+  <meta name="description" content="CricBoard: local cricket tournament manager, ball-by-ball scoring and temporary live spectator scoreboard.">
+  <title>CricBoard · Local Cricket Scoring</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <div id="adminApp">
+    <header class="topbar">
+      <div class="brand"><span class="brand-icon" aria-hidden="true">●</span><span>CRIC<span class="brand-accent">BOARD</span></span><span class="brand-caption">Local Tournament Studio</span></div>
+      <div class="top-right"><span class="status-dot"></span><span>Match control</span><a class="help-link" href="https://github.com/khumphringFa/CricBoard" target="_blank" rel="noopener">Repository ↗</a></div>
+    </header>
+    <div class="app-layout">
+      <aside class="sidebar">
+        <div class="side-head"><span class="overline">TOURNAMENT CONTROL</span><h2>Your cricket hub</h2><p>Create a tournament, add teams and start scoring.</p></div>
+        <section class="side-section">
+          <label for="tournamentSelect" class="label">Active tournament</label>
+          <select id="tournamentSelect" class="field" aria-label="Active tournament"></select>
+          <form id="tournamentForm" class="inline-form">
+            <input class="field" name="tournament" maxlength="64" placeholder="New tournament name" aria-label="New tournament name" required>
+            <button class="btn btn-small btn-ghost" type="submit" title="Add tournament">+ Add</button>
+          </form>
+        </section>
+        <section class="side-section">
+          <div class="section-label"><span>TEAMS</span><span class="counter" id="teamCount">0</span></div>
+          <div id="teamsList" class="team-list"></div>
+          <form id="teamForm" class="inline-form">
+            <input class="field" name="team" maxlength="45" placeholder="Enter a team name" aria-label="Team name" required>
+            <button class="btn btn-small btn-ghost" type="submit">+ Add</button>
+          </form>
+        </section>
+        <div class="sidebar-note"><span class="note-icon">↗</span><div><strong>Built for grassroots cricket</strong><p>Short-format matches, village cups, school games and local leagues.</p></div></div>
+      </aside>
+      <main class="main-content">
+        <div class="page-head"><div><span class="overline">MATCH CENTER</span><h1>Every run. Every moment.</h1><p>Manage fixtures, record each delivery and put the score on a big screen.</p></div><div class="tag"><span class="pulse"></span> LOCAL TOURNAMENTS</div></div>
+        <div class="summary-cards" id="statsBar"></div>
+        <div class="workspace-grid">
+          <div class="primary-column">
+            <section class="panel">
+              <div class="panel-title"><div><span class="overline">LIVE SCORING</span><h2>Match scoreboard</h2></div><span id="matchStatePill" class="pill">No match selected</span></div>
+              <div id="matchScore" class="score-placeholder"><span class="empty-ball">●</span><h3>Ready for the first ball?</h3><p>Add two teams and create a fixture to begin scoring.</p></div>
+              <div id="scoringControls" class="controls" hidden>
+                <div class="controls-title"><strong>Record a delivery</strong><span>Tap once per ball</span></div>
+                <div class="run-grid">
+                  <button class="run-btn" data-kind="bat" data-runs="0">0<span>DOT</span></button>
+                  <button class="run-btn" data-kind="bat" data-runs="1">1<span>RUN</span></button>
+                  <button class="run-btn" data-kind="bat" data-runs="2">2<span>RUNS</span></button>
+                  <button class="run-btn" data-kind="bat" data-runs="3">3<span>RUNS</span></button>
+                  <button class="run-btn boundary" data-kind="bat" data-runs="4">4<span>FOUR</span></button>
+                  <button class="run-btn boundary" data-kind="bat" data-runs="6">6<span>SIX</span></button>
+                </div>
+                <div class="extra-line"><select id="extraType" class="field" aria-label="Extra type"><option value="wide">Wide</option><option value="noBall">No-ball</option><option value="bye">Bye</option><option value="legBye">Leg-bye</option></select><label for="extraRuns" class="small-field-label">Additional runs</label><select id="extraRuns" class="field small-select" aria-label="Extra runs"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select><button type="button" class="btn btn-outline" data-action="extra">Add extras</button></div>
+                <div class="action-line"><button type="button" class="btn btn-danger" data-action="wicket">✕ &nbsp; Wicket</button><button type="button" class="btn btn-light" data-action="undo">↶ &nbsp; Undo last ball</button><button type="button" class="btn btn-light" data-action="end">End innings</button></div>
+                <p class="hint">Wides and no-balls add a one-run penalty and do not use a legal ball. Basic wicket scoring records a legal dot ball.</p>
+              </div>
+              <div id="matchActions" class="match-actions"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-title"><div><span class="overline">FIXTURES</span><h2>Matches</h2></div><span class="counter" id="matchCount">0</span></div>
+              <div id="matchesList" class="match-list"></div>
+            </section>
+          </div>
+          <div class="secondary-column">
+            <section class="panel">
+              <div class="panel-title"><div><span class="overline">NEW FIXTURE</span><h2>Create a match</h2></div><span class="decor-icon">＋</span></div>
+              <form id="matchForm" class="stacked-form">
+                <label class="label" for="matchLabel">Match name <span class="muted">(optional)</span></label><input id="matchLabel" class="field" name="label" placeholder="Final / Match 1" maxlength="80">
+                <label class="label" for="teamA">Team A</label><select id="teamA" class="field" required></select>
+                <label class="label" for="teamB">Team B</label><select id="teamB" class="field" required></select>
+                <div class="form-grid"><div><label class="label" for="overs">Overs per innings</label><input id="overs" class="field" name="overs" type="number" min="1" max="50" value="10" required></div><div><label class="label" for="battingFirst">Batting first</label><select id="battingFirst" class="field" required></select></div></div>
+                <button class="btn btn-primary btn-wide" type="submit">+ Create fixture</button>
+              </form>
+            </section>
+            <section class="panel">
+              <div class="panel-title"><div><span class="overline">ON THE BIG SCREEN</span><h2>Live display link</h2></div><span class="decor-icon">▣</span></div>
+              <div class="share-banner"><span class="display-symbol">▣</span><div><strong>Share the score, not the controls.</strong><p>Broadcast a read-only scoreboard on another phone, TV or projector while this scoring page remains open.</p></div></div>
+              <div id="sharingStatus" class="connection-status"><span class="status-dot amber"></span>Not broadcasting</div>
+              <div class="sharing-buttons"><button class="btn btn-primary" id="startLive" type="button">Start temporary live link</button><button class="btn btn-outline" id="stopLive" type="button" disabled>Stop sharing</button></div>
+              <div class="share-url"><label class="label" for="shareLink">Spectator display URL</label><input id="shareLink" class="field" readonly placeholder="Start sharing to generate a link"><button id="copyLive" class="btn btn-light btn-wide" type="button">Copy display link</button></div>
+              <button id="openLocal" class="btn btn-text" type="button">Open a display on this device ↗</button>
+              <p class="hint">Temporary peer-to-peer broadcast: the link stops working when you stop sharing or close the scoring device. The scorer must stay online. Internet access is required on both devices.</p>
+            </section>
+            <section class="panel">
+              <div class="panel-title"><div><span class="overline">TOURNAMENT TABLE</span><h2>Points table</h2></div></div>
+              <div id="pointsTable"></div>
+            </section>
+          </div>
+        </div>
+        <footer class="footer">CricBoard · Local-first scores saved in this browser · For public events, share only information you intend spectators to see.</footer>
+      </main>
+    </div>
+  </div>
+  <div id="displayApp" hidden>
+    <div class="display-shell">
+      <header class="display-header"><div class="brand"><span class="brand-icon" aria-hidden="true">●</span><span>CRIC<span class="brand-accent">BOARD</span></span></div><div class="broadcast-indicator"><span class="status-dot" id="displayDot"></span><span id="displayConnection">Connecting to scorekeeper…</span></div></header>
+      <div id="displayContent" class="display-content"><div class="display-wait"><div class="load-ball">●</div><h1>Waiting for the scoreboard</h1><p>Keep this screen open. Live scores will appear when the scorer connects.</p></div></div>
+      <footer class="display-footer"><span>CRICBOARD • LOCAL CRICKET LIVE</span><span id="displayUpdated">Temporary spectator display</span></footer>
+    </div>
+  </div>
+  <div id="toast" role="status" aria-live="polite" class="toast" hidden></div>
+</body>
+</html>
