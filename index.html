@@ -17,10 +17,10 @@
 <body>
   <div id="publicPortal" hidden><header class="public-nav"><a href="?public=1" class="brand"><span class="brand-icon">●</span>CRIC<span class="brand-accent">BOARD</span></a><a class="btn btn-primary" href="?manage=1">Organizer sign in →</a></header><main class="public-main"><div id="publicBrowse"><section class="public-hero"><span class="public-kicker">GRASSROOTS CRICKET • LIVE &amp; LOCAL</span><h1>Every match matters.</h1><p>Follow local tournaments, live scores, fixtures, results and player statistics.</p></section><div class="public-filters"><input id="publicSearch" class="field" placeholder="Search loaded tournaments" aria-label="Search tournaments"><select id="publicFilter" class="field" aria-label="Filter tournaments"><option value="all">All tournaments</option><option value="live">Live matches</option><option value="upcoming">Upcoming fixtures</option><option value="completed">Results</option></select></div><div id="publicCards" class="public-grid"></div><button id="publicMore" class="btn btn-outline" hidden>Load more tournaments</button></div><div id="publicDetail"></div><p id="publicStatus" role="status">Loading tournaments…</p></main><footer class="public-footer">CricBoard • Only tournaments explicitly published by approved organizers are shown.</footer></div>
   <section id="accountGate" class="panel" style="max-width:440px;margin:10vh auto;padding:32px;text-align:center" hidden><h1>🏏 CricBoard</h1><p>Sign in with Google to manage your tournaments. New accounts require administrator approval. Central tournament synchronization is required.</p><div id="googleLogin"></div><p id="accountStatus" role="status">Checking account…</p><div id="organizerTerms" hidden><h2>Organizer data terms</h2><p>Tournament, team, player and match records on this device will be synchronized to CricBoard's Cloudflare database and accessible to the Super Admin for oversight and recovery. Synchronization is mandatory to use organizer tools. Personal Google Drive backups remain private; publishing to spectators is separate. If you do not agree, sign out or browse public tournaments.</p><label><input type="checkbox" id="termsAgree"> I accept these terms and have permission to enter the player information.</label><p><button id="acceptTerms" class="btn btn-primary">Accept and continue</button></p></div><button id="accountLogout" class="btn btn-light" hidden>Sign out</button><p><a href="?public=1">Browse public tournaments</a></p></section>
-  <div id="adminApp" hidden>
+  <div id="adminApp" data-mobile-view="score" hidden>
     <header class="topbar">
       <div class="brand"><span class="brand-icon" aria-hidden="true">●</span><span>CRIC<span class="brand-accent">BOARD</span></span><span class="brand-caption">Local Tournament Studio</span></div>
-      <div class="top-right"><span id="accountEmail"></span><a href="?public=1" class="btn btn-light">Public portal</a><button id="signOut" class="btn btn-light">Sign out</button><a class="help-link" href="https://github.com/khumphringFa/CricBoard" target="_blank" rel="noopener">Repository ↗</a></div>
+      <div class="top-right"><span id="mobileNetwork" class="mobile-network" role="status"></span><span id="accountEmail"></span><a href="?public=1" class="btn btn-light">Public portal</a><button id="signOut" class="btn btn-light">Sign out</button><a class="help-link" href="https://github.com/khumphringFa/CricBoard" target="_blank" rel="noopener">Repository ↗</a></div>
     </header>
     <div class="app-layout">
       <aside class="sidebar">
@@ -51,17 +51,17 @@
         <details class="side-section"><summary class="label">All tournaments</summary><div id="tournamentsOverview" class="team-list"></div></details>
         <div class="sidebar-note"><span class="note-icon">↗</span><div><strong>Built for grassroots cricket</strong><p>Short-format matches, village cups, school games and local leagues.</p></div></div>
       </aside>
-      <main class="main-content">
-        <div class="page-head"><div><span class="overline">MATCH CENTER</span><h1>Every run. Every moment.</h1><p>Manage fixtures, record each delivery and put the score on a big screen.</p></div><div class="tag"><span class="pulse"></span> LOCAL TOURNAMENTS</div></div>
-        <section id="accountsPanel" class="panel" hidden><h2>User approval</h2><button id="refreshAccounts" class="btn btn-light">Refresh accounts</button><div id="accountList" class="team-list"></div></section>
-        <section id="centralAdminPanel" class="panel" hidden><div class="panel-title"><div><span class="overline">SUPER ADMIN</span><h2>Central tournament dashboard</h2></div><button id="centralRefresh" class="btn btn-light">Refresh</button></div><p class="hint">Central synchronization is mandatory for approved organizers. Records appear after the first successful sync. Private Google Drive backups are not accessible here.</p><div id="centralMetrics" class="public-counts"></div><input id="centralSearch" class="field" placeholder="Filter organizer email" aria-label="Filter organizers"><div id="centralOrganizers"></div><button id="centralCsv" class="btn btn-outline">Export organizer CSV</button><div id="centralLeaders"></div><label for="centralOrganizer" class="label">Organizer tournament records</label><select id="centralOrganizer" class="field"></select><div id="centralDetail"></div><div class="cloud-buttons"><button id="centralDownload" class="btn btn-light" disabled>Download recovery JSON</button><button id="centralTournamentCsv" class="btn btn-light" disabled>Export matches CSV</button></div><p id="centralAdminStatus" role="status" class="hint"></p></section>
-        <section class="panel" id="serverBackup"><h2>Account records</h2><p>Save a copy to your account or restore it on another device. Google Drive remains available separately.</p><button id="serverSave" class="btn btn-primary">Save account copy</button> <button id="serverRestore" class="btn btn-light">Restore account copy</button><p id="serverStatus" role="status" class="hint"></p></section>
-        <section class="panel"><h2>Central organization sync</h2><p>Required for organizer accounts. Tournament records automatically synchronize while the app is open and are accessible to CricBoard Super Admin. Personal Drive backups and public publishing remain separate.</p><div class="cloud-buttons"><button id="centralEnable" class="btn btn-primary" disabled>Resolve conflict: replace central copy</button><button id="centralSync" class="btn btn-light" disabled>Sync now</button><button id="centralRestore" class="btn btn-light" disabled>Restore central copy</button></div><p id="centralStatus" role="status" class="hint">Checking central synchronization…</p></section>
-        <section class="panel" id="publicationPanel"><h2>Public tournament visibility</h2><p>Only the active tournament will be shared. Other tournament records and backups remain private.</p><label class="cloud-auto"><input type="checkbox" id="publishPlayers"> Include player names and scorecards (confirm player consent)</label><label class="cloud-auto"><input type="checkbox" id="publishAuto" disabled> Automatically refresh published scores in this session</label><div class="cloud-buttons"><button id="publishTournament" class="btn btn-primary">Publish / update tournament</button><button id="unpublishTournament" class="btn btn-light">Unpublish</button></div><p id="publicationStatus" role="status" class="hint">Private until published.</p><a id="publicationLink" target="_blank" rel="noopener" hidden>Open public tournament ↗</a></section>
+      <main class="main-content" id="mobileWorkspace">
+        <div class="mobile-context"><div><span class="overline">ACTIVE TOURNAMENT</span><strong id="mobileTournament"></strong></div><button type="button" class="btn btn-outline" data-mobile-tab="teams">Switch</button></div><div class="page-head"><div><span class="overline">MATCH CENTER</span><h1>Every run. Every moment.</h1><p>Manage fixtures, record each delivery and put the score on a big screen.</p></div><div class="tag"><span class="pulse"></span> LOCAL TOURNAMENTS</div></div>
+        <section id="accountsPanel" class="panel" data-mobile-section="settings" hidden><h2>User approval</h2><button id="refreshAccounts" class="btn btn-light">Refresh accounts</button><div id="accountList" class="team-list"></div></section>
+        <section id="centralAdminPanel" class="panel" data-mobile-section="settings" hidden><div class="panel-title"><div><span class="overline">SUPER ADMIN</span><h2>Central tournament dashboard</h2></div><button id="centralRefresh" class="btn btn-light">Refresh</button></div><p class="hint">Central synchronization is mandatory for approved organizers. Records appear after the first successful sync. Private Google Drive backups are not accessible here.</p><div id="centralMetrics" class="public-counts"></div><input id="centralSearch" class="field" placeholder="Filter organizer email" aria-label="Filter organizers"><div id="centralOrganizers"></div><button id="centralCsv" class="btn btn-outline">Export organizer CSV</button><div id="centralLeaders"></div><label for="centralOrganizer" class="label">Organizer tournament records</label><select id="centralOrganizer" class="field"></select><div id="centralDetail"></div><div class="cloud-buttons"><button id="centralDownload" class="btn btn-light" disabled>Download recovery JSON</button><button id="centralTournamentCsv" class="btn btn-light" disabled>Export matches CSV</button></div><p id="centralAdminStatus" role="status" class="hint"></p></section>
+        <section class="panel" id="serverBackup" data-mobile-section="settings"><h2>Account records</h2><p>Save a copy to your account or restore it on another device. Google Drive remains available separately.</p><button id="serverSave" class="btn btn-primary">Save account copy</button> <button id="serverRestore" class="btn btn-light">Restore account copy</button><p id="serverStatus" role="status" class="hint"></p></section>
+        <section class="panel" data-mobile-section="settings"><h2>Central organization sync</h2><p>Required for organizer accounts. Tournament records automatically synchronize while the app is open and are accessible to CricBoard Super Admin. Personal Drive backups and public publishing remain separate.</p><div class="cloud-buttons"><button id="centralEnable" class="btn btn-primary" disabled>Resolve conflict: replace central copy</button><button id="centralSync" class="btn btn-light" disabled>Sync now</button><button id="centralRestore" class="btn btn-light" disabled>Restore central copy</button></div><p id="centralStatus" role="status" class="hint">Checking central synchronization…</p></section>
+        <section class="panel" id="publicationPanel" data-mobile-section="settings"><h2>Public tournament visibility</h2><p>Only the active tournament will be shared. Other tournament records and backups remain private.</p><label class="cloud-auto"><input type="checkbox" id="publishPlayers"> Include player names and scorecards (confirm player consent)</label><label class="cloud-auto"><input type="checkbox" id="publishAuto" disabled> Automatically refresh published scores in this session</label><div class="cloud-buttons"><button id="publishTournament" class="btn btn-primary">Publish / update tournament</button><button id="unpublishTournament" class="btn btn-light">Unpublish</button></div><p id="publicationStatus" role="status" class="hint">Private until published.</p><a id="publicationLink" target="_blank" rel="noopener" hidden>Open public tournament ↗</a></section>
         <div class="summary-cards" id="statsBar"></div>
         <div class="workspace-grid">
           <div class="primary-column">
-            <section class="panel">
+            <section class="panel" data-mobile-section="score">
               <div class="panel-title"><div><span class="overline">LIVE SCORING</span><h2>Match scoreboard</h2></div><span id="matchStatePill" class="pill">No match selected</span></div>
               <div id="matchScore" class="score-placeholder"><span class="empty-ball">●</span><h3>Ready for the first ball?</h3><p>Add two teams and create a fixture to begin scoring.</p></div>
               <div id="scoringControls" class="controls" hidden>
@@ -83,14 +83,14 @@
               <div id="matchActions" class="match-actions"></div>
               <div id="matchScorecard"></div>
             </section>
-            <section class="panel">
+            <section class="panel" data-mobile-section="fixtures">
               <div class="panel-title"><div><span class="overline">FIXTURES</span><h2>Matches</h2></div><span class="counter" id="matchCount">0</span></div>
               <div id="matchesList" class="match-list"></div>
             </section>
-            <section class="panel"><div class="panel-title"><div><span class="overline">TOURNAMENT STATISTICS</span><h2>Player leaderboards</h2></div></div><label for="statsScope" class="label">Statistics scope</label><select id="statsScope" class="field"><option value="active">Active tournament</option><option value="all">All tournaments</option></select><label class="cloud-auto"><input id="statsCompleted" type="checkbox"> Completed matches only</label><div id="playerLeaders"></div></section>
+            <section class="panel" data-mobile-section="stats"><div class="panel-title"><div><span class="overline">TOURNAMENT STATISTICS</span><h2>Player leaderboards</h2></div></div><label for="statsScope" class="label">Statistics scope</label><select id="statsScope" class="field"><option value="active">Active tournament</option><option value="all">All tournaments</option></select><label class="cloud-auto"><input id="statsCompleted" type="checkbox"> Completed matches only</label><div id="playerLeaders"></div></section>
           </div>
           <div class="secondary-column">
-            <section class="panel cloud-panel" aria-labelledby="cloudTitle">
+            <section class="panel cloud-panel" data-mobile-section="settings" aria-labelledby="cloudTitle">
               <div class="panel-title"><div><span class="overline">YOUR DATA, ANY DEVICE</span><h2 id="cloudTitle">Backup &amp; Google sync</h2></div><span class="decor-icon" aria-hidden="true">☁</span></div>
               <p class="cloud-description">Keep tournaments, teams, match scores and results in your private Google Drive app storage. Previous cloud versions are kept.</p>
               <p id="cloudAccount" class="cloud-account">Not connected</p>
@@ -114,7 +114,7 @@
               </details>
               <p class="hint">Backups are private to this app and account, hidden from the Drive file list. Google tokens stay in memory and are cleared when this page closes. Disconnect keeps your backups.</p>
             </section>
-            <section class="panel">
+            <section class="panel" data-mobile-section="fixtures">
               <div class="panel-title"><div><span class="overline">NEW FIXTURE</span><h2>Create a match</h2></div><span class="decor-icon">＋</span></div>
               <form id="matchForm" class="stacked-form">
                 <label class="cloud-auto"><input id="trackPlayers" type="checkbox" checked> Record batter &amp; bowler statistics</label><p class="hint">Uses the team's current playing squad (2–11 players). Existing matches keep their original totals.</p>
@@ -125,7 +125,7 @@
                 <button class="btn btn-primary btn-wide" type="submit">+ Create fixture</button>
               </form>
             </section>
-            <section class="panel">
+            <section class="panel" data-mobile-section="score">
               <div class="panel-title"><div><span class="overline">ON THE BIG SCREEN</span><h2>Live display link</h2></div><span class="decor-icon">▣</span></div>
               <div class="share-banner"><span class="display-symbol">▣</span><div><strong>Share the score, not the controls.</strong><p>Broadcast a read-only scoreboard on another phone, TV or projector while this scoring page remains open.</p></div></div>
               <div id="sharingStatus" class="connection-status"><span class="status-dot amber"></span>Not broadcasting</div>
@@ -134,7 +134,7 @@
               <button id="openLocal" class="btn btn-text" type="button">Open a display on this device ↗</button>
               <p class="hint">Temporary peer-to-peer broadcast: the link stops working when you stop sharing or close the scoring device. The scorer must stay online. Internet access is required on both devices.</p>
             </section>
-            <section class="panel">
+            <section class="panel" data-mobile-section="stats">
               <div class="panel-title"><div><span class="overline">TOURNAMENT TABLE</span><h2>Points table</h2></div></div>
               <div id="pointsTable"></div>
             </section>
@@ -143,6 +143,7 @@
         <footer class="footer">CricBoard · Local-first scores saved in this browser · For public events, share only information you intend spectators to see.</footer>
       </main>
     </div>
+    <nav class="mobile-nav" aria-label="Match center navigation"><button type="button" data-mobile-tab="score" aria-current="page"><span aria-hidden="true">◉</span>Score</button><button type="button" data-mobile-tab="teams"><span aria-hidden="true">♟</span>Teams</button><button type="button" data-mobile-tab="fixtures"><span aria-hidden="true">▤</span>Fixtures</button><button type="button" data-mobile-tab="stats"><span aria-hidden="true">▥</span>Stats</button><button type="button" data-mobile-tab="settings"><span aria-hidden="true">⚙</span>Settings</button></nav>
   </div>
   <div id="displayApp" hidden>
     <div class="display-shell">
