@@ -83,7 +83,7 @@ public final class MainActivity extends Activity {
         try{
             GetSignInWithGoogleOption option=new GetSignInWithGoogleOption.Builder(CLIENT).build();
             GetCredentialRequest request=new GetCredentialRequest.Builder().addCredentialOption(option).build();
-            CredentialManager.create(this).getCredentialAsync(this,request,new CancellationSignal(),getMainExecutor(),new CredentialManagerCallback<GetCredentialResponse,GetCredentialException>(){
+            CredentialManager.create(this).getCredentialAsync(this,request,new CancellationSignal(),this::runOnUiThread,new CredentialManagerCallback<GetCredentialResponse,GetCredentialException>(){
                 @Override public void onResult(GetCredentialResponse result){authBusy=false;try{String token=GoogleIdTokenCredential.createFrom(result.getCredential().getData()).getIdToken();respond(reply,id,token,null);}catch(Exception e){respond(reply,id,null,"Google credential was not valid");}}
                 @Override public void onError(GetCredentialException e){authBusy=false;respond(reply,id,null,"Google sign-in failed or was cancelled. Verify Android OAuth configuration.");}
             });
