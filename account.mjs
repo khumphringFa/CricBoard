@@ -24,6 +24,9 @@ async function show(account){
 }
 async function init(){
   if(remote){$('accountGate').hidden=true;await import('./app.js');return;}
+  const params=new URLSearchParams(location.search);
+  if(params.has('public')||params.has('tournament')||(!params.has('manage')&&!params.has('local'))){await (await import('./portal.mjs')).initPortal();return;}
+  $('accountGate').hidden=false;
   $('accountLogout').onclick=logout;
   try {await show(await api('me'));return;}catch(e){status(e.message);}
   const script=document.createElement('script');script.src='https://accounts.google.com/gsi/client';script.async=true;

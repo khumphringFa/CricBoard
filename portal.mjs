@@ -1,0 +1,24 @@
+const $=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+const endpoint=async path=>{const r=await fetch('/api/public'+path,{cache:'no-store'});if(!r.ok)throw Error(r.status===404?'This tournament is not publicly available.':'Could not load tournaments. Try again.');return r.json();};
+const table=(headers,rows)=>rows.length?'<div class="table-wrap"><table class="standings"><thead><tr>'+headers.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>':'<p class="portal-muted">No statistics yet.</p>';
+const state={items:[],offset:0,more:true,filter:'all',search:''};
+const matchStatus=m=>({live:'● Live',break:'Innings break',scheduled:'Upcoming',completed:'Completed'})[m.status]||m.status;
+function cards(){
+  const list=state.items.filter(t=>(state.filter==='all'||(state.filter==='live'&&t.live)||(state.filter==='upcoming'&&t.scheduled)||(state.filter==='completed'&&t.completed))&&t.name.toLowerCase().includes(state.search.toLowerCase()));
+  $('publicCards').innerHTML=list.length?list.map(t=>`<a class="public-card" href="?tournament=${encodeURIComponent(t.slug)}"><span class="public-kicker">${t.live?'● LIVE MATCHES':'TOURNAMENT'}</span><h2>${esc(t.name)}</h2><div class="public-counts"><span>${t.teams} teams</span><span>${t.live} live</span><span>${t.scheduled} upcoming</span><span>${t.completed} results</span></div><strong>View tournament →</strong></a>`).join(''):'<p class="portal-muted">No published tournaments match this view.</p>';
+  $('publicMore').hidden=!state.more;
+}
+async function loadMore(){const next=await endpoint('?offset='+state.offset);state.items.push(...next);state.offset+=next.length;state.more=next.length===24;cards();}
+function renderTournament(t){
+  const groups=[['Live matches',t.matches.filter(m=>['live','break'].includes(m.status))],['Upcoming fixtures',t.matches.filter(m=>m.status==='scheduled')],['Results',t.matches.filter(m=>m.status==='completed')]];
+  const match=m=>`<article class="public-match"><span class="public-kicker">${esc(matchStatus(m))} · ${esc(m.label)}</span><h3>${esc(m.teamA)} vs ${esc(m.teamB)}</h3>${m.innings.map(i=>`<div class="public-score"><span>${esc(i.team)}</span><strong>${i.runs}/${i.wickets}</strong><small>${esc(i.overs)} ov</small></div>${i.batting?`<details><summary>Innings scorecard</summary>${table(['Batter','R','B','4s','6s','SR','Status'],i.batting.map(p=>[p.name,p.runs,p.balls,p.fours,p.sixes,p.strikeRate,p.status]))}${table(['Bowler','O','M','R','W','Econ'],i.bowling.map(p=>[p.name,p.overs,p.maidens,p.runs,p.wickets,p.economy]))}</details>`:''}`).join('')}<p class="portal-muted">${esc(m.result||'')}</p></article>`;
+  $('publicDetail').innerHTML=`<a href="?public=1" class="public-kicker">← All tournaments</a><h1>${esc(t.name)}</h1><p class="portal-muted">Last published ${esc(new Date(t.updatedAt).toLocaleString())} · ${t.teams.length} teams</p><div class="public-counts">${t.teams.map(n=>`<span>${esc(n)}</span>`).join('')}</div>${groups.map(([label,ms])=>`<section class="public-section"><h2>${label} (${ms.length})</h2><div class="public-grid">${ms.length?ms.map(match).join(''):'<p class="portal-muted">No matches.</p>'}</div></section>`).join('')}<section class="public-section"><h2>Points table</h2>${table(['Team','P','W','L','T','Pts'],t.points.map(p=>[p.team,p.played,p.won,p.lost,p.tied,p.points]))}</section>${t.batting.length||t.bowling.length?`<section class="public-section"><h2>Batting leaders</h2>${table(['Player','Team','Runs','Balls','HS','SR'],t.batting.map(p=>[p.name,p.team,p.runs,p.balls,p.highest,p.strikeRate]))}<h2>Bowling leaders</h2>${table(['Player','Team','Overs','Runs','Wickets','Economy'],t.bowling.map(p=>[p.name,p.team,p.overs,p.runs,p.wickets,p.economy]))}</section>`:''}`;
+}
+export async function initPortal(){
+  $('publicPortal').hidden=false;$('accountGate').hidden=true;
+  const slug=new URLSearchParams(location.search).get('tournament');
+  if(slug){$('publicBrowse').hidden=true;let updated=null;const refresh=async()=>{try{const t=await endpoint('/'+encodeURIComponent(slug));if(updated!==t.updatedAt){renderTournament(t);updated=t.updatedAt;}$('publicStatus').textContent='';}catch(e){$('publicDetail').replaceChildren();$('publicStatus').textContent=e.message;updated=null;}};await refresh();setInterval(refresh,15000);return;}
+  $('publicSearch').oninput=e=>{state.search=e.target.value;cards();};$('publicFilter').onchange=e=>{state.filter=e.target.value;cards();};$('publicMore').onclick=()=>loadMore().catch(e=>$('publicStatus').textContent=e.message);
+  try{await loadMore();$('publicStatus').textContent='';}catch(e){$('publicStatus').textContent=e.message;}
+}

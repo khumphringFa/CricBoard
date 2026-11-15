@@ -6,9 +6,15 @@ CricBoard is a lightweight, mobile-first web app for village tournaments, school
 
 ## Open CricBoard — live app
 
-**[Launch CricBoard / Google account backup sign-in](https://cricboard.manas-tripura.workers.dev/)**
+**[Browse public tournaments](https://cricboard.manas-tripura.workers.dev/)** · **[Organizer sign-in](https://cricboard.manas-tripura.workers.dev/?manage=1)**
 
 The primary hosted app runs on Cloudflare Workers. Use this URL on your computer or phone. To connect your Google account, open the app and use the Google Drive backup controls. Approved Google sign-in is required for scoring.
+
+## V2.0 — Public cricket portal
+
+The home page is now a public tournament directory. Visitors can browse published fixtures, results, points tables, and (if enabled by the organizer) player scorecards and leaderboards. Each published tournament has a permanent shareable link. No account is needed to browse.
+
+Organizers sign in using the **Organizer sign in** link. Choose the active tournament and use **Publish / update tournament** to publish a separate public projection. Existing tournaments remain private by default. Include player names only after obtaining appropriate consent. Enable automatic public score refresh after publishing to keep that tournament current while scoring in the same session. The public detail view checks for updates every 15 seconds. Unpublishing removes public access without deleting private records; a stale automatic update cannot make it public again. Never enter sensitive information in public tournament or team names.
 
 ## Account registration and administrator approval
 
@@ -37,7 +43,7 @@ Production deployment uses the Git-connected Cloudflare Worker (`main` branch), 
 
 ## Using the app
 
-1. Open [CricBoard on Cloudflare](https://cricboard.manas-tripura.workers.dev/) and sign in with Google.
+1. Open [Organizer sign-in](https://cricboard.manas-tripura.workers.dev/?manage=1) and sign in with Google.
 2. Add a tournament, at least two teams, and Create fixture. Select Start match.
 3. As each ball is delivered, tap the runs, wicket, or the relevant extra. Press Undo if a mistake was made.
 4. Tap Start second innings after the innings break. The match completes automatically after a successful chase, all 10 wickets, or the legal balls limit.

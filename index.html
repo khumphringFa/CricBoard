@@ -10,15 +10,17 @@
   <title>CricBoard · Local Cricket Scoring</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="public.css">
   <script defer src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
   <script type="module" src="account.mjs"></script>
 </head>
 <body>
-  <section id="accountGate" class="panel" style="max-width:440px;margin:10vh auto;padding:32px;text-align:center"><h1>🏏 CricBoard</h1><p>Sign in with Google to manage your tournaments. New accounts require administrator approval.</p><div id="googleLogin"></div><p id="accountStatus" role="status">Checking account…</p><button id="accountLogout" class="btn btn-light" hidden>Sign out</button></section>
+  <div id="publicPortal" hidden><header class="public-nav"><a href="?public=1" class="brand"><span class="brand-icon">●</span>CRIC<span class="brand-accent">BOARD</span></a><a class="btn btn-primary" href="?manage=1">Organizer sign in →</a></header><main class="public-main"><div id="publicBrowse"><section class="public-hero"><span class="public-kicker">GRASSROOTS CRICKET • LIVE &amp; LOCAL</span><h1>Every match matters.</h1><p>Follow local tournaments, live scores, fixtures, results and player statistics.</p></section><div class="public-filters"><input id="publicSearch" class="field" placeholder="Search loaded tournaments" aria-label="Search tournaments"><select id="publicFilter" class="field" aria-label="Filter tournaments"><option value="all">All tournaments</option><option value="live">Live matches</option><option value="upcoming">Upcoming fixtures</option><option value="completed">Results</option></select></div><div id="publicCards" class="public-grid"></div><button id="publicMore" class="btn btn-outline" hidden>Load more tournaments</button></div><div id="publicDetail"></div><p id="publicStatus" role="status">Loading tournaments…</p></main><footer class="public-footer">CricBoard • Only tournaments explicitly published by approved organizers are shown.</footer></div>
+  <section id="accountGate" class="panel" style="max-width:440px;margin:10vh auto;padding:32px;text-align:center" hidden><h1>🏏 CricBoard</h1><p>Sign in with Google to manage your tournaments. New accounts require administrator approval.</p><div id="googleLogin"></div><p id="accountStatus" role="status">Checking account…</p><button id="accountLogout" class="btn btn-light" hidden>Sign out</button><p><a href="?public=1">Browse public tournaments</a></p></section>
   <div id="adminApp" hidden>
     <header class="topbar">
       <div class="brand"><span class="brand-icon" aria-hidden="true">●</span><span>CRIC<span class="brand-accent">BOARD</span></span><span class="brand-caption">Local Tournament Studio</span></div>
-      <div class="top-right"><span id="accountEmail"></span><button id="signOut" class="btn btn-light">Sign out</button><a class="help-link" href="https://github.com/khumphringFa/CricBoard" target="_blank" rel="noopener">Repository ↗</a></div>
+      <div class="top-right"><span id="accountEmail"></span><a href="?public=1" class="btn btn-light">Public portal</a><button id="signOut" class="btn btn-light">Sign out</button><a class="help-link" href="https://github.com/khumphringFa/CricBoard" target="_blank" rel="noopener">Repository ↗</a></div>
     </header>
     <div class="app-layout">
       <aside class="sidebar">
@@ -53,6 +55,7 @@
         <div class="page-head"><div><span class="overline">MATCH CENTER</span><h1>Every run. Every moment.</h1><p>Manage fixtures, record each delivery and put the score on a big screen.</p></div><div class="tag"><span class="pulse"></span> LOCAL TOURNAMENTS</div></div>
         <section id="accountsPanel" class="panel" hidden><h2>User approval</h2><button id="refreshAccounts" class="btn btn-light">Refresh accounts</button><div id="accountList" class="team-list"></div></section>
         <section class="panel" id="serverBackup"><h2>Account records</h2><p>Save a copy to your account or restore it on another device. Google Drive remains available separately.</p><button id="serverSave" class="btn btn-primary">Save account copy</button> <button id="serverRestore" class="btn btn-light">Restore account copy</button><p id="serverStatus" role="status" class="hint"></p></section>
+        <section class="panel" id="publicationPanel"><h2>Public tournament visibility</h2><p>Only the active tournament will be shared. Other tournament records and backups remain private.</p><label class="cloud-auto"><input type="checkbox" id="publishPlayers"> Include player names and scorecards (confirm player consent)</label><label class="cloud-auto"><input type="checkbox" id="publishAuto" disabled> Automatically refresh published scores in this session</label><div class="cloud-buttons"><button id="publishTournament" class="btn btn-primary">Publish / update tournament</button><button id="unpublishTournament" class="btn btn-light">Unpublish</button></div><p id="publicationStatus" role="status" class="hint">Private until published.</p><a id="publicationLink" target="_blank" rel="noopener" hidden>Open public tournament ↗</a></section>
         <div class="summary-cards" id="statsBar"></div>
         <div class="workspace-grid">
           <div class="primary-column">
