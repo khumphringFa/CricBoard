@@ -138,6 +138,21 @@ test('tournament leaderboards isolate events and squash duplicate names by stabl
   assert.equal(stats.find(p=>p.id==='A1').runs,4);
   assert.equal(stats.find(p=>p.id==='B1').conceded,4);
   assert.equal(tournamentPlayerStats([a],'unknown').length,0);
+  const all=tournamentPlayerStats([a,other],null);
+  assert.equal(all.filter(p=>p.id==='A1').length,2);
+  assert.equal(all.find(p=>p.id==='A1' && p.tournamentId==='another').runs,6);
+});
+test('extended bowling metrics count only used bowlers and credit wickets and extras', () => {
+  let m=tracked();
+  assert.equal(tournamentPlayerStats([m],'t').some(p=>p.id==='B1'),false);
+  m=applyDelivery(m,{kind:'wide',runs:0});
+  m=applyDelivery(m,{kind:'wicket',runs:0});
+  const p=tournamentPlayerStats([m],'t').find(p=>p.id==='B1');
+  assert.equal(p.bowlingInnings,1);
+  assert.equal(p.wides,1);
+  assert.equal(p.bestBowling,'1/1');
+  assert.equal(p.bowlingAverage,'1.00');
+  assert.equal(p.bowlingStrikeRate,'1.00');
 });
 test('selection prevents duplicate batters, foreign players and mid-over bowler changes', () => {
   const m=tracked();

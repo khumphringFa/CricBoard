@@ -122,12 +122,16 @@ function renderPlayerControls(m) {
   $("creaseForm").onsubmit = event => { event.preventDefault(); updateMatch(match => selectPlayers(match, {striker:$("pick-striker").value, nonStriker:$("pick-nonStriker").value, bowler:$("pick-bowler").value})); };
 }
 function renderTournamentStats() {
-  const data = tournamentPlayerStats(store.matches, tournament()?.id);
+  const scope = $('statsScope').value;
+  const completedOnly = $('statsCompleted').checked;
+  const eligible = store.matches.filter(m => !completedOnly || m.status === 'completed');
+  const data = tournamentPlayerStats(eligible, scope === 'all' ? null : tournament()?.id);
+  const playerLabel = p => p.name + ' / ' + nameOf(p.team) + (scope === 'all' ? ' / ' + (store.tournaments.find(t => t.id === p.tournamentId)?.name || '') : '');
   const batting = [...data].filter(p => p.innings).sort((a,b) => b.runs-a.runs || a.name.localeCompare(b.name));
-  const bowling = [...data].filter(p => p.bowlingBalls || p.conceded).sort((a,b) => b.wickets-a.wickets || a.conceded-b.conceded);
-  $("playerLeaders").innerHTML = '<p class="hint">' + esc(tournament()?.name) + ' only · Includes live and completed player-tracked matches. Older team-only results do not invent player statistics.</p>' +
-    (data.length ? '<h3>Batting leaders</h3>' + statsTable(['Player / team','Inn','R','B','4s','6s','HS','Avg','SR'], batting.map(p => [p.name+' / '+nameOf(p.team),p.innings,p.runs,p.balls,p.fours,p.sixes,p.highest,p.average,p.strikeRate])) +
-      '<h3>Bowling leaders</h3>' + statsTable(['Player / team','O','M','R','W','Econ'], bowling.map(p => [p.name+' / '+nameOf(p.team),oversText(p.bowlingBalls),p.maidens,p.conceded,p.wickets,p.economy])) : '<p class="empty-line">Add squads, create a player-tracked match, and start scoring.</p>');
+  const bowling = [...data].filter(p => p.bowlingInnings).sort((a,b) => b.wickets-a.wickets || a.conceded-b.conceded);
+  $("playerLeaders").innerHTML = '<p class="hint">' + esc(scope === 'all' ? 'All tournaments (separate player/team entries)' : tournament()?.name) + ' · ' + (completedOnly ? 'Completed matches only.' : 'Includes live and completed player-tracked matches.') + ' Older team-only results do not invent player statistics.</p>' +
+    (data.length ? '<h3>Batting leaders</h3>' + statsTable(['#','Player / team','Inn','NO','R','B','4s','6s','HS','50s','100s','Avg','SR'], batting.map((p,i) => [i+1,playerLabel(p),p.innings,p.innings-p.outs,p.runs,p.balls,p.fours,p.sixes,p.highest,p.fifties,p.hundreds,p.average,p.strikeRate])) +
+      '<h3>Bowling leaders</h3>' + statsTable(['#','Player / team','Inn','O','M','R','W','Wd','Nb','Best','Avg','SR','Econ'], bowling.map((p,i) => [i+1,playerLabel(p),p.bowlingInnings,oversText(p.bowlingBalls),p.maidens,p.conceded,p.wickets,p.wides,p.noBalls,p.bestBowling,p.bowlingAverage,p.bowlingStrikeRate,p.economy])) : '<p class="empty-line">No player statistics in this selection.</p>');
 }
 function openWicket() {
   const m = current();
@@ -365,6 +369,8 @@ function connectToHost() {
   } catch { showLost("Unable to connect. Retrying…"); }
 }
 function bindUI() {
+  $('statsScope').addEventListener('change', renderTournamentStats);
+  $('statsCompleted').addEventListener('change', renderTournamentStats);
   $("rosterTeam").addEventListener('change', renderRoster);
   $("playerForm").addEventListener('submit', event => {
     event.preventDefault();

@@ -74,21 +74,27 @@ export function inningsScorecard(match, inn) {
 
 export function tournamentPlayerStats(matches, tournamentId) {
   const rows = new Map();
-  for (const m of matches.filter(m => m.tournamentId === tournamentId && m.playerMode)) {
+  for (const m of matches.filter(m => (tournamentId == null || m.tournamentId === tournamentId) && m.playerMode)) {
     for (const inn of m.innings) {
       const card = inningsScorecard(m, inn);
       const row = (p, team) => {
-        if (!rows.has(p.id)) rows.set(p.id, { id: p.id, name: p.name, team, runs: 0, balls: 0, fours: 0, sixes: 0, innings: 0, outs: 0, highest: 0, wickets: 0, bowlingBalls: 0, conceded: 0, maidens: 0 });
-        return rows.get(p.id);
+        const key = JSON.stringify([m.tournamentId, team, p.id]);
+        if (!rows.has(key)) rows.set(key, { id: p.id, name: p.name, team, tournamentId: m.tournamentId, runs: 0, balls: 0, fours: 0, sixes: 0, innings: 0, outs: 0, highest: 0, fifties: 0, hundreds: 0, wickets: 0, bowlingBalls: 0, conceded: 0, maidens: 0, bowlingInnings: 0, wides: 0, noBalls: 0, bestWickets: 0, bestRuns: 0 });
+        return rows.get(key);
       };
       for (const p of card.batting.filter(p => p.entered)) {
         const r = row(p, inn.batting); r.runs += p.runs; r.balls += p.balls; r.fours += p.fours; r.sixes += p.sixes;
         r.innings++; r.outs += p.dismissal ? 1 : 0; r.highest = Math.max(r.highest, p.runs);
+        if (p.runs >= 100) r.hundreds++; else if (p.runs >= 50) r.fifties++;
       }
-      for (const p of card.bowling) { const r = row(p, inn.bowling); r.wickets += p.wickets; r.bowlingBalls += p.balls; r.conceded += p.runs; r.maidens += p.maidens; }
+      for (const p of card.bowling.filter(p => p.used)) {
+        const r = row(p, inn.bowling);
+        if (!r.bowlingInnings || p.wickets > r.bestWickets || (p.wickets === r.bestWickets && p.runs < r.bestRuns)) { r.bestWickets = p.wickets; r.bestRuns = p.runs; }
+        r.bowlingInnings++; r.wickets += p.wickets; r.bowlingBalls += p.balls; r.conceded += p.runs; r.maidens += p.maidens; r.wides += p.wides; r.noBalls += p.noBalls;
+      }
     }
   }
-  return [...rows.values()].map(p => ({ ...p, average: p.outs ? (p.runs / p.outs).toFixed(2) : '—', strikeRate: p.balls ? (p.runs * 100 / p.balls).toFixed(2) : '—', economy: p.bowlingBalls ? (p.conceded * 6 / p.bowlingBalls).toFixed(2) : '—' }));
+  return [...rows.values()].map(p => ({ ...p, average: p.outs ? (p.runs / p.outs).toFixed(2) : '—', strikeRate: p.balls ? (p.runs * 100 / p.balls).toFixed(2) : '—', economy: p.bowlingBalls ? (p.conceded * 6 / p.bowlingBalls).toFixed(2) : '—', bowlingAverage: p.wickets ? (p.conceded / p.wickets).toFixed(2) : '—', bowlingStrikeRate: p.wickets ? (p.bowlingBalls / p.wickets).toFixed(2) : '—', bestBowling: p.bowlingInnings ? `${p.bestWickets}/${p.bestRuns}` : '—' }));
 }
 
 // Rebuild player state from deliveries before accepting a downloaded scorecard.
