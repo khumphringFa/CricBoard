@@ -11,13 +11,14 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <script defer src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
-  <script type="module" src="app.js"></script>
+  <script type="module" src="account.mjs"></script>
 </head>
 <body>
-  <div id="adminApp">
+  <section id="accountGate" class="panel" style="max-width:440px;margin:10vh auto;padding:32px;text-align:center"><h1>🏏 CricBoard</h1><p>Sign in with Google to manage your tournaments. New accounts require administrator approval.</p><div id="googleLogin"></div><p id="accountStatus" role="status">Checking account…</p><button id="accountLogout" class="btn btn-light" hidden>Sign out</button></section>
+  <div id="adminApp" hidden>
     <header class="topbar">
       <div class="brand"><span class="brand-icon" aria-hidden="true">●</span><span>CRIC<span class="brand-accent">BOARD</span></span><span class="brand-caption">Local Tournament Studio</span></div>
-      <div class="top-right"><span class="status-dot"></span><span>Match control</span><a class="help-link" href="https://github.com/khumphringFa/CricBoard" target="_blank" rel="noopener">Repository ↗</a></div>
+      <div class="top-right"><span id="accountEmail"></span><button id="signOut" class="btn btn-light">Sign out</button><a class="help-link" href="https://github.com/khumphringFa/CricBoard" target="_blank" rel="noopener">Repository ↗</a></div>
     </header>
     <div class="app-layout">
       <aside class="sidebar">
@@ -50,6 +51,8 @@
       </aside>
       <main class="main-content">
         <div class="page-head"><div><span class="overline">MATCH CENTER</span><h1>Every run. Every moment.</h1><p>Manage fixtures, record each delivery and put the score on a big screen.</p></div><div class="tag"><span class="pulse"></span> LOCAL TOURNAMENTS</div></div>
+        <section id="accountsPanel" class="panel" hidden><h2>User approval</h2><button id="refreshAccounts" class="btn btn-light">Refresh accounts</button><div id="accountList" class="team-list"></div></section>
+        <section class="panel" id="serverBackup"><h2>Account records</h2><p>Save a copy to your account or restore it on another device. Google Drive remains available separately.</p><button id="serverSave" class="btn btn-primary">Save account copy</button> <button id="serverRestore" class="btn btn-light">Restore account copy</button><p id="serverStatus" role="status" class="hint"></p></section>
         <div class="summary-cards" id="statsBar"></div>
         <div class="workspace-grid">
           <div class="primary-column">

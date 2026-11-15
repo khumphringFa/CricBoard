@@ -1,7 +1,7 @@
 import { makeId, createMatch, startMatch, applyDelivery, undoDelivery, advanceInnings, endInnings, summary, standings, oversText, lastOverDeliveries, selectPlayers, inningsScorecard, tournamentPlayerStats } from "./engine.mjs";
 import { initCloud, validateStore } from "./cloud.mjs";
 
-const KEY = "cricboard-tournaments-v1";
+const KEY = window.cricboardAccount?.key || 'cricboard-spectator-empty';
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const empty = () => { const id = makeId(); return { tournaments: [{ id, name: "My Local Tournament" }], teams: [], matches: [], activeTournamentId: id, activeMatchId: null }; };
@@ -457,8 +457,12 @@ function bindUI() {
 }
 if (spectator) initDisplay();
 else {
+  if (!window.cricboardAccount || window.cricboardAccount.status !== 'approved') throw Error('Approved sign-in required');
   bindUI(); render();
+  const account=window.cricboardAccount;
+  const scopedStorage={getItem:k=>localStorage.getItem(KEY+':'+k),setItem:(k,v)=>localStorage.setItem(KEY+':'+k,v),removeItem:k=>localStorage.removeItem(KEY+':'+k)};
   cloud = initCloud({
+    storage:scopedStorage, expectedSub:account.sub,
     getStore: () => store,
     replaceStore: input => {
       const restored = validateStore(input);
@@ -467,6 +471,11 @@ else {
       stopLive(); store = restored; store.players ||= []; render();
     }
   });
+  let revision=null, loaded=false;
+  const serverStatus=message=>{$('serverStatus').textContent=message;};
+  const serverAction=async action=>{ $('serverSave').disabled=$('serverRestore').disabled=true;try{await action();}catch(e){serverStatus(e.message);}finally{$('serverSave').disabled=$('serverRestore').disabled=false;} };
+  $('serverSave').onclick=()=>serverAction(async()=>{if(!loaded){const remote=await account.api('snapshot');if(remote.data&&!confirm('An account copy already exists. Replace it with the current device records?'))return;revision=remote.revision;loaded=true;}const saved=await account.api('snapshot','PUT',{revision,data:store});revision=saved.revision;serverStatus('Account copy saved.');});
+  $('serverRestore').onclick=()=>serverAction(async()=>{const remote=await account.api('snapshot');if(!remote.data)return serverStatus('No account copy saved yet.');if(!confirm('Restore your account copy? Current records will be retained in a local recovery copy.'))return;const checked=validateStore(remote.data);scopedStorage.setItem('cricboard-recovery-v1',JSON.stringify({app:'CricBoard',version:1,savedAt:new Date().toISOString(),data:store}));localStorage.setItem(KEY,JSON.stringify(checked));stopLive();store=checked;store.players||=[];revision=remote.revision;loaded=true;render();cloud.changed();serverStatus('Account copy restored.');});
   window.addEventListener('storage', event => {
     if (event.key !== KEY) return;
     // Keep another scorer tab from overwriting this tab's newer scores.

@@ -160,7 +160,7 @@ export function readBackup(value) {
   return validateStore(value.data);
 }
 
-export function initCloud({ getStore, replaceStore, storage = localStorage }) {
+export function initCloud({ getStore, replaceStore, storage = localStorage, expectedSub = null }) {
   const $ = id => document.getElementById(id);
   const clientKey = 'cricboard-google-client-id';
   const recoveryKey = 'cricboard-recovery-v1';
@@ -301,6 +301,7 @@ export function initCloud({ getStore, replaceStore, storage = localStorage }) {
           const candidate = new DriveSnapshots(response.access_token);
           const profile = await candidate.api('https://www.googleapis.com/oauth2/v3/userinfo');
           if (!profile.sub || !profile.email) throw new Error('Could not identify the Google account. Try connecting again.');
+          if (expectedSub && profile.sub !== expectedSub) throw new Error('Connect the same Google account used to sign in to CricBoard.');
           if (session !== epoch) return;
           drive = candidate; account = profile; expires = Date.now() + Math.max(0, Number(response.expires_in) - 60) * 1000;
           // An account switch must not silently copy the previous account's data.
