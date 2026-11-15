@@ -60,13 +60,14 @@ test('pending or suspended users cannot read or update account records',async()=
 });
 test('real SQL isolates account snapshots and rejects stale revisions',async()=>{
   const sql=new DatabaseSync(':memory:');sql.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));
-  const DB={prepare:statement=>({bind:(...args)=>({first:async()=>sql.prepare(statement).get(...args),run:async()=>({meta:sql.prepare(statement).run(...args)}),all:async()=>({results:sql.prepare(statement).all(...args)})})})};
+  const DB={prepare:statement=>{const bound=(...args)=>({first:async()=>sql.prepare(statement).get(...args),run:async()=>({meta:sql.prepare(statement).run(...args)}),all:async()=>({results:sql.prepare(statement).all(...args)})});return {...bound(),bind:bound};}};
   const tokens=['a'.repeat(64),'b'.repeat(64)];
   for(const [i,token] of tokens.entries()){
     const sub='user'+i;sql.prepare('INSERT INTO accounts VALUES(?,?,?,?,?)').run(sub,sub+'@gmail.com','organizer','approved',Date.now());
     const digest=Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token))).toString('hex');sql.prepare('INSERT INTO sessions VALUES(?,?,?)').run(digest,sub,Date.now()+60000);
   }
   const request=(i,path,method='GET',body)=>handle(new Request('https://example.com/api/'+path,{method,headers:{Cookie:'__Host-cricboard='+tokens[i],Origin:'https://example.com','Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)}),{DB});
+  for(const i of [0,1])assert.equal((await request(i,'terms','POST',{version:'central-required-v1',accept:true})).status,200);
   const data={tournaments:[{id:'t',name:'Private league'}],teams:[],matches:[],activeTournamentId:'t',activeMatchId:null};
   assert.equal((await request(0,'snapshot','PUT',{revision:null,data})).status,200);
   assert.equal((await (await request(1,'snapshot')).json()).data,null);
@@ -84,6 +85,7 @@ test('public portal requires explicit publication, isolates owners, hides suspen
   }
   const req=(i,path,method='GET',body)=>handle(new Request('https://example.com/api/'+path,{method,headers:{...(i===null?{}:{Cookie:'__Host-cricboard='+tokens[i]}),Origin:'https://example.com','Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)}),{DB});
   const data={tournaments:[{id:'t',name:'Public league',privateNote:'never expose'}],teams:[{id:'a',name:'Alpha',tournamentId:'t',contact:'private phone'}],players:[{id:'p',name:'Private Player',teamId:'a',tournamentId:'t'}],matches:[],activeTournamentId:'t',activeMatchId:null,secret:'never expose'};
+  for(const i of [0,1])assert.equal((await req(i,'terms','POST',{version:'central-required-v1',accept:true})).status,200);
   assert.deepEqual(await (await req(null,'public')).json(),[]);
   assert.equal((await req(null,'publications','POST',{data})).status,401);
   const pub=await (await req(0,'publications','POST',{data})).json();assert.ok(pub.slug);
@@ -98,7 +100,7 @@ test('public portal requires explicit publication, isolates owners, hides suspen
   assert.equal((await req(null,'public/'+pub.slug)).status,404);assert.equal((await req(0,'publications','PUT',{data,updatedAt:pub.updated_at})).status,409);
   const again=await (await req(0,'publications','POST',{data})).json();assert.equal(again.slug,pub.slug);
 });
-test('central sharing requires consent, restricts admin access and preserves private backups',async()=>{
+test('mandatory central sync requires terms, cannot be disabled and preserves private backups',async()=>{
   const sql=new DatabaseSync(':memory:');sql.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));
   const DB={prepare:statement=>{const bound=(...args)=>({first:async()=>sql.prepare(statement).get(...args),run:async()=>({meta:sql.prepare(statement).run(...args)}),all:async()=>({results:sql.prepare(statement).all(...args)})});return {...bound(),bind:bound};}};
   const tokens=['a'.repeat(64),'b'.repeat(64),'c'.repeat(64)];
@@ -107,6 +109,11 @@ test('central sharing requires consent, restricts admin access and preserves pri
   }
   const req=(i,path,method='GET',body)=>handle(new Request('https://example.com/api/'+path,{method,headers:{...(i===null?{}:{Cookie:'__Host-cricboard='+tokens[i]}),Origin:'https://example.com','Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)}),{DB});
   let data={tournaments:[{id:'t',name:'Shared league',secret:'private metadata'}],teams:[],matches:[],activeTournamentId:'t',activeMatchId:null,secret:'private metadata'};
+  assert.equal((await req(1,'central','POST',{revision:null,data,consent:true})).status,403);
+  assert.equal((await req(1,'snapshot','PUT',{revision:null,data})).status,403);
+  assert.equal((await req(1,'terms','POST',{version:'old',accept:true})).status,400);
+  assert.equal((await req(1,'terms','POST',{version:'central-required-v1',accept:false})).status,400);
+  for(const i of [1,2])assert.equal((await req(i,'terms','POST',{version:'central-required-v1',accept:true})).status,200);
   await req(1,'snapshot','PUT',{revision:null,data});
   assert.equal((await req(0,'central-admin/user1')).status,404);
   assert.equal((await req(null,'central-admin')).status,401);
@@ -118,10 +125,10 @@ test('central sharing requires consent, restricts admin access and preserves pri
   const detail=await (await req(0,'central-admin/user1')).json();assert.equal(detail.data.tournaments[0].name,'Shared league');assert.doesNotMatch(JSON.stringify(detail),/private metadata/);
   assert.equal((await req(2,'central-admin/user1')).status,404);
   assert.equal((await req(1,'central','PUT',{revision:first.revision,data})).status,200);assert.equal((await req(1,'central','PUT',{revision:first.revision,data})).status,409);
-  const latest=await (await req(1,'central')).json();assert.equal((await req(1,'central','DELETE')).status,200);
-  assert.equal((await req(0,'central-admin/user1')).status,404);assert.equal((await req(1,'central','PUT',{revision:latest.revision,data})).status,409);
+  const latest=await (await req(1,'central')).json();assert.equal((await req(1,'central','DELETE')).status,403);
+  assert.equal((await req(0,'central-admin/user1')).status,200);assert.equal((await req(1,'central','PUT',{revision:latest.revision,data})).status,200);
   assert.equal((await (await req(1,'snapshot')).json()).data.secret,'private metadata');
-  assert.equal((await (await req(1,'central')).json()).enabled,false);
+  assert.equal((await (await req(1,'central')).json()).enabled,true);
 });
 test('central backup retains cricket deliveries and computes global tournament leaders',()=>{
   const squads={A:[{id:'A1',name:'Batter one'},{id:'A2',name:'Batter two'}],B:[{id:'B1',name:'Bowler one'},{id:'B2',name:'Bowler two'}]};
