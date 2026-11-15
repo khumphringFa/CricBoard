@@ -6,6 +6,6 @@
   "d1_databases": [{ "binding": "DB", "database_name": "cricboard-accounts", "database_id": "d8363bfd-f297-45b3-939b-0648aa98b238" }],
   "assets": { "directory": "./dist", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
   "build": {
-    "command": "mkdir -p dist && cp index.html styles.css public.css app.js account.mjs portal.mjs engine.mjs cloud.mjs favicon.svg dist/"
+    "command": "mkdir -p dist && cp index.html styles.css public.css app.js account.mjs portal.mjs central.mjs engine.mjs cloud.mjs favicon.svg dist/"
   }
 }

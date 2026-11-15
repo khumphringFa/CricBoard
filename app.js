@@ -1,5 +1,6 @@
 import { makeId, createMatch, startMatch, applyDelivery, undoDelivery, advanceInnings, endInnings, summary, standings, oversText, lastOverDeliveries, selectPlayers, inningsScorecard, tournamentPlayerStats } from "./engine.mjs";
 import { initCloud, validateStore } from "./cloud.mjs";
+import { setupCentral } from './central.mjs';
 
 const KEY = window.cricboardAccount?.key || 'cricboard-spectator-empty';
 const $ = id => document.getElementById(id);
@@ -15,6 +16,7 @@ let store = read();
 store.players ||= [];
 let cloud = null;
 let publicationChanged=()=>{}, publicationRender=()=>{};
+let centralChanged=()=>{};
 let peer = null;
 let liveMatchId = null;
 let liveConnections = new Set();
@@ -30,7 +32,7 @@ const localId = query.get("local");
 const spectator = Boolean(remoteId || localId);
 
 function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(store)); cloud?.changed(); publicationChanged(); }
+  try { localStorage.setItem(KEY, JSON.stringify(store)); cloud?.changed(); publicationChanged(); centralChanged(); }
   catch { notify("Browser storage is unavailable. Scores may not be saved."); }
 }
 function notify(message) {
@@ -497,18 +499,19 @@ else {
       const restored = validateStore(input);
       // Persist successfully before changing the score screen or stopping a broadcast.
       localStorage.setItem(KEY, JSON.stringify(restored));
-      stopLive(); store = restored; store.players ||= []; render();
+      stopLive(); store = restored; store.players ||= []; render(); centralChanged();
     }
   });
+  centralChanged=setupCentral({account,storage:scopedStorage,getStore:()=>store,replaceStore:checked=>{scopedStorage.setItem('cricboard-recovery-v1',JSON.stringify({app:'CricBoard',version:1,savedAt:new Date().toISOString(),data:store}));localStorage.setItem(KEY,JSON.stringify(checked));stopLive();store=checked;store.players||=[];render();cloud.changed();}}).changed;
   let revision=null, loaded=false;
   const serverStatus=message=>{$('serverStatus').textContent=message;};
   const serverAction=async action=>{ $('serverSave').disabled=$('serverRestore').disabled=true;try{await action();}catch(e){serverStatus(e.message);}finally{$('serverSave').disabled=$('serverRestore').disabled=false;} };
   $('serverSave').onclick=()=>serverAction(async()=>{if(!loaded){const remote=await account.api('snapshot');if(remote.data&&!confirm('An account copy already exists. Replace it with the current device records?'))return;revision=remote.revision;loaded=true;}const saved=await account.api('snapshot','PUT',{revision,data:store});revision=saved.revision;serverStatus('Account copy saved.');});
-  $('serverRestore').onclick=()=>serverAction(async()=>{const remote=await account.api('snapshot');if(!remote.data)return serverStatus('No account copy saved yet.');if(!confirm('Restore your account copy? Current records will be retained in a local recovery copy.'))return;const checked=validateStore(remote.data);scopedStorage.setItem('cricboard-recovery-v1',JSON.stringify({app:'CricBoard',version:1,savedAt:new Date().toISOString(),data:store}));localStorage.setItem(KEY,JSON.stringify(checked));stopLive();store=checked;store.players||=[];revision=remote.revision;loaded=true;render();cloud.changed();serverStatus('Account copy restored.');});
+  $('serverRestore').onclick=()=>serverAction(async()=>{const remote=await account.api('snapshot');if(!remote.data)return serverStatus('No account copy saved yet.');if(!confirm('Restore your account copy? Current records will be retained in a local recovery copy.'))return;const checked=validateStore(remote.data);scopedStorage.setItem('cricboard-recovery-v1',JSON.stringify({app:'CricBoard',version:1,savedAt:new Date().toISOString(),data:store}));localStorage.setItem(KEY,JSON.stringify(checked));stopLive();store=checked;store.players||=[];revision=remote.revision;loaded=true;render();cloud.changed();centralChanged();serverStatus('Account copy restored.');});
   window.addEventListener('storage', event => {
     if (event.key !== KEY) return;
     // Keep another scorer tab from overwriting this tab's newer scores.
-    store = read(); store.players ||= []; render(); broadcast(); cloud.changed();
+    store = read(); store.players ||= []; render(); broadcast(); cloud.changed(); centralChanged();
   });
 }
 

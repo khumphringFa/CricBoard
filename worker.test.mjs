@@ -4,6 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import {handle,verifyGoogle,canonicalEmail,registerVerifiedIdentity} from './worker.mjs';
 import {publicTournament} from './public-data.mjs';
+import {centralStore,centralSummary} from './central-data.mjs';
 import {createMatch,startMatch,selectPlayers,applyDelivery} from './engine.mjs';
 
 test('public scorecards are opt-in and derive scores without exposing raw deliveries',()=>{
@@ -96,4 +97,35 @@ test('public portal requires explicit publication, isolates owners, hides suspen
   sql.prepare("UPDATE accounts SET status='approved' WHERE sub='owner0'").run();assert.equal((await req(0,'publications','DELETE',{tournamentId:'t'})).status,200);
   assert.equal((await req(null,'public/'+pub.slug)).status,404);assert.equal((await req(0,'publications','PUT',{data,updatedAt:pub.updated_at})).status,409);
   const again=await (await req(0,'publications','POST',{data})).json();assert.equal(again.slug,pub.slug);
+});
+test('central sharing requires consent, restricts admin access and preserves private backups',async()=>{
+  const sql=new DatabaseSync(':memory:');sql.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));
+  const DB={prepare:statement=>{const bound=(...args)=>({first:async()=>sql.prepare(statement).get(...args),run:async()=>({meta:sql.prepare(statement).run(...args)}),all:async()=>({results:sql.prepare(statement).all(...args)})});return {...bound(),bind:bound};}};
+  const tokens=['a'.repeat(64),'b'.repeat(64),'c'.repeat(64)];
+  for(const [i,token] of tokens.entries()){
+    const sub='user'+i;sql.prepare('INSERT INTO accounts VALUES(?,?,?,?,?)').run(sub,sub+'@gmail.com',i===0?'admin':'organizer','approved',Date.now());const digest=Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token))).toString('hex');sql.prepare('INSERT INTO sessions VALUES(?,?,?)').run(digest,sub,Date.now()+60000);
+  }
+  const req=(i,path,method='GET',body)=>handle(new Request('https://example.com/api/'+path,{method,headers:{...(i===null?{}:{Cookie:'__Host-cricboard='+tokens[i]}),Origin:'https://example.com','Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)}),{DB});
+  let data={tournaments:[{id:'t',name:'Shared league',secret:'private metadata'}],teams:[],matches:[],activeTournamentId:'t',activeMatchId:null,secret:'private metadata'};
+  await req(1,'snapshot','PUT',{revision:null,data});
+  assert.equal((await req(0,'central-admin/user1')).status,404);
+  assert.equal((await req(null,'central-admin')).status,401);
+  assert.equal((await req(2,'central-admin')).status,404);
+  assert.equal((await req(1,'central','POST',{revision:null,data})).status,400);
+  assert.equal((await req(1,'central','PUT',{revision:null,data})).status,409);
+  const first=await (await req(1,'central','POST',{revision:null,data,consent:true})).json();assert.ok(first.revision);
+  const overview=await (await req(0,'central-admin')).json();assert.equal(overview.find(x=>x.sub==='user1').summary.tournaments,1);assert.equal(overview.find(x=>x.sub==='user2').summary,null);
+  const detail=await (await req(0,'central-admin/user1')).json();assert.equal(detail.data.tournaments[0].name,'Shared league');assert.doesNotMatch(JSON.stringify(detail),/private metadata/);
+  assert.equal((await req(2,'central-admin/user1')).status,404);
+  assert.equal((await req(1,'central','PUT',{revision:first.revision,data})).status,200);assert.equal((await req(1,'central','PUT',{revision:first.revision,data})).status,409);
+  const latest=await (await req(1,'central')).json();assert.equal((await req(1,'central','DELETE')).status,200);
+  assert.equal((await req(0,'central-admin/user1')).status,404);assert.equal((await req(1,'central','PUT',{revision:latest.revision,data})).status,409);
+  assert.equal((await (await req(1,'snapshot')).json()).data.secret,'private metadata');
+  assert.equal((await (await req(1,'central')).json()).enabled,false);
+});
+test('central backup retains cricket deliveries and computes global tournament leaders',()=>{
+  const squads={A:[{id:'A1',name:'Batter one'},{id:'A2',name:'Batter two'}],B:[{id:'B1',name:'Bowler one'},{id:'B2',name:'Bowler two'}]};
+  let m=startMatch(createMatch({tournamentId:'t',teamA:'A',teamB:'B',battingFirst:'A',overs:2,squads}));m=selectPlayers(m,{striker:'A1',nonStriker:'A2',bowler:'B1'});m=applyDelivery(m,{kind:'bat',runs:4});
+  const clean=centralStore({tournaments:[{id:'t',name:'Cup'}],teams:[{id:'A',name:'Alpha',tournamentId:'t'},{id:'B',name:'Beta',tournamentId:'t'}],matches:[m],activeTournamentId:'t',activeMatchId:m.id});
+  assert.equal(clean.matches[0].innings[0].deliveries[0].runs,4);const summary=centralSummary(clean);assert.equal(summary.batting[0].runs,4);assert.equal(summary.bowling[0].runs,4);assert.equal(summary.live,1);
 });
