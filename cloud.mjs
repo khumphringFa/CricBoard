@@ -96,7 +96,7 @@ function parseMetadata(file) {
 }
 
 export class DriveSnapshots {
-  constructor(token, request = fetch) { this.token = token; this.request = request; }
+  constructor(token, request = (url, options) => fetch(url, options)) { this.token = token; this.request = request; }
   async api(url, options = {}) {
     const response = await this.request(url, { ...options, headers: { ...options.headers, Authorization: 'Bearer ' + this.token }, signal: AbortSignal.timeout(30000) });
     if (!response.ok) {
