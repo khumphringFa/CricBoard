@@ -4,3 +4,73 @@ body.display-mode{background:#071424;color:#fff}body.display-mode #adminApp{disp
 
 :where(.cloud-panel) .cloud-description{font-size:12px;color:#617086;line-height:1.6;margin:0 0 12px}.cloud-account{font-size:13px;font-weight:750;overflow-wrap:anywhere}.cloud-buttons{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.cloud-status{font-size:12px;line-height:1.6;color:#167e77;background:#effaf8;border:1px solid #d4eee7;padding:12px;border-radius:9px;overflow-wrap:anywhere;min-height:44px}.cloud-auto{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:700;margin-top:14px}.cloud-auto input{width:18px;height:18px;accent-color:#109b7f}.cloud-panel .label{margin-top:14px}.cloud-panel .hint{margin-bottom:13px}.cloud-details{border-top:1px solid #e5ebef;padding-top:12px;margin-top:15px}.cloud-details summary{font-size:12px;font-weight:750;cursor:pointer;color:#41516a}.cloud-details .field{margin:8px 0}.cloud-details input[type=file]{font-size:11px}
 .crease-form{background:#f0faf8;border:1px solid #ccebe2;border-radius:12px;padding:14px;margin-bottom:18px}.crease-form>strong{font-size:13px}.crease-form .label{margin-top:10px}.scorecard{margin-top:20px;padding-top:15px;border-top:1px solid #dfe7ed}.scorecard summary{font-weight:800;font-size:13px;cursor:pointer}.scorecard h3,#playerLeaders h3{font-size:13px;color:#167e77;margin:18px 0 5px}.scorecard td,#playerLeaders td{white-space:nowrap}.scorecard td:first-child{min-width:100px}.wicket-dialog{border:1px solid #ccebe2;border-radius:15px;max-width:460px;width:calc(100% - 30px);max-height:90vh;overflow:auto;padding:24px;color:#162239}.wicket-dialog::backdrop{background:#0c1930aa}.wicket-dialog h2{font-size:21px;margin:0 0 12px}.display-player-strip{display:flex;justify-content:center;gap:20px;flex-wrap:wrap;padding:20px 10px;color:#9be9d3;font-size:clamp(12px,1.5vw,24px);font-weight:750}.sidebar>.side-section:last-child{margin-top:8px}textarea.field{resize:vertical}
+
+/* Matchday mobile workspace — desktop and spectator layouts remain unchanged. */
+.mobile-nav,.mobile-network,.mobile-context,.mobile-empty-actions{display:none}
+.innings-progress{height:5px;background:#244459;overflow:hidden}
+.innings-progress span{display:block;height:100%;background:linear-gradient(90deg,#20d7a8,#a2f06c);transition:width .25s ease}
+@media(max-width:750px){
+  #adminApp{min-height:100dvh;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px));background:#edf2f5}
+  #adminApp .topbar{position:sticky;top:0;z-index:25;padding:10px 15px;gap:8px;min-height:60px;background:#0b1d30;box-shadow:0 3px 15px #07142422}
+  #adminApp .brand{font-size:19px;gap:6px}.brand-icon{width:32px;height:32px;border-radius:10px}
+  #adminApp .top-right{gap:6px;flex-wrap:wrap;justify-content:flex-end}#adminApp #accountEmail{display:none}
+  #adminApp .top-right .btn{min-height:33px;padding:6px 9px;font-size:10px;white-space:nowrap}
+  .mobile-network{display:inline-flex!important;align-items:center;gap:5px;color:#b5f8e5;font-size:10px;font-weight:800;white-space:nowrap}
+  .mobile-network::before{content:"";width:7px;height:7px;border-radius:50%;background:#28d5a8}
+  .mobile-network.offline{color:#ffd5a0}.mobile-network.offline::before{background:#f4b65e}
+  #adminApp .main-content{padding:13px 12px 18px;max-width:640px}
+  #adminApp .page-head{display:none}
+  .mobile-context{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0d293d;color:#fff;border-radius:17px;padding:15px;margin:0 0 13px;box-shadow:0 7px 20px #0b253418}
+  .mobile-context>div{min-width:0}.mobile-context strong{display:block;overflow-wrap:anywhere;font-size:17px;margin-top:3px}
+  .mobile-context .overline{color:#77e2c9;font-size:9px}.mobile-context .btn{flex:none;border:1px solid #426876;background:#143a4d;color:#c9fff1;min-height:40px}
+  #adminApp .sidebar{display:none;background:transparent;padding:14px;max-width:640px;margin:auto;gap:13px;border:0}
+  #adminApp[data-mobile-view="teams"] .sidebar{display:flex}
+  #adminApp[data-mobile-view="teams"] .main-content{display:none}
+  #adminApp .sidebar .side-head{display:block;background:#0d293d;color:#fff;padding:20px;border-radius:17px}
+  #adminApp .sidebar .side-head p{color:#c1d4df}
+  #adminApp .side-section{background:#fff;padding:16px;border:1px solid #dce7ec;border-radius:15px}
+  #adminApp .summary-cards{display:none}
+  #adminApp[data-mobile-view="stats"] .summary-cards{display:grid}
+  #adminApp [data-mobile-section]{display:none}
+  #adminApp[data-mobile-view="score"] [data-mobile-section="score"]:not([hidden]),#adminApp[data-mobile-view="fixtures"] [data-mobile-section="fixtures"]:not([hidden]),#adminApp[data-mobile-view="stats"] [data-mobile-section="stats"]:not([hidden]),#adminApp[data-mobile-view="settings"] [data-mobile-section="settings"]:not([hidden]){display:block}
+  #adminApp[data-mobile-view="settings"] .workspace-grid{margin-top:12px}
+  #adminApp .main-content > .panel:not([hidden]){margin-bottom:12px}
+  #adminApp .workspace-grid,#adminApp .primary-column,#adminApp .secondary-column{display:block}
+  #adminApp .primary-column>.panel,#adminApp .secondary-column>.panel{margin-bottom:12px}
+  #adminApp .panel{border-radius:17px;padding:15px;box-shadow:0 3px 14px #132c4010;border:1px solid #dfe7eb}
+  #adminApp .panel-title{margin-bottom:13px}
+  #adminApp .panel-title h2{font-size:20px}
+  #adminApp .field{min-height:46px;font-size:14px}
+  #adminApp .btn{min-height:44px;font-size:13px}
+  #adminApp .top-right .btn{min-height:33px;font-size:10px}
+  #adminApp .score-card{background:radial-gradient(circle at 90% -15%,#29786d 0%,transparent 50%),linear-gradient(145deg,#102b42,#0b172a 80%);border-radius:15px;box-shadow:0 7px 18px #102c4326}
+  #adminApp .score-center{padding:17px 15px}#adminApp .score-top{padding:15px 15px 0}
+  #adminApp .score-big{font-size:clamp(38px,13vw,66px);letter-spacing:-2px}
+  #adminApp .score-bottom{padding:13px 15px}
+  #adminApp .score-team-name{font-size:clamp(16px,4.5vw,24px)}
+  #adminApp .innings-grid{gap:6px}#adminApp .mini-metric{padding:10px 7px;border-radius:10px;background:#edf4f6}
+  #adminApp .mini-metric span{font-size:9px;line-height:1.25;display:block;color:#526a7d}
+  #adminApp .run-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  #adminApp .run-btn{min-height:66px;font-size:29px;border-radius:13px;border-color:#d7e3e9;background:#f3f7f9;transition:transform .12s,background .12s}
+  #adminApp .run-btn span{font-size:10px;color:#547085;margin-top:5px}
+  #adminApp .run-btn.boundary{background:#d7f5e9;border-color:#9cdbca;color:#006d58}
+  #adminApp .run-btn:not(:disabled):active{transform:scale(.94);background:#c8e8e2}
+  #adminApp .ball{min-width:32px;height:32px;border-radius:50%}
+  #adminApp .ball.four,#adminApp .ball.six{background:#087d64;color:#fff}
+  #adminApp .score-placeholder{min-height:210px;padding:19px 12px}
+  .mobile-empty-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-top:15px}
+  #adminApp .hint{font-size:12px;color:#66788a}
+  #adminApp .action-line .btn{font-size:12px;min-height:48px}
+  #adminApp .extra-line .small-field-label{width:100%}
+  #adminApp .match-item{min-height:64px;padding:13px}
+  #adminApp .match-item-body strong{font-size:14px}
+  .mobile-nav{position:fixed;bottom:0;left:0;right:0;z-index:30;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));padding:7px 5px calc(7px + env(safe-area-inset-bottom,0px));background:#fff;border-top:1px solid #dce6ec;box-shadow:0 -5px 24px #0c213518}
+  .mobile-nav button{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;min-height:55px;padding:5px 2px;background:none;border:0;border-radius:11px;color:#64788b;font-size:10px;font-weight:800;white-space:nowrap}
+  .mobile-nav button span{font-size:23px;line-height:1;color:inherit}
+  .mobile-nav button[aria-current="page"]{background:#dcf5eb;color:#006d59}
+  #adminApp .footer{margin:15px 4px;font-size:10px}
+  .toast{bottom:calc(81px + env(safe-area-inset-bottom,0px))}
+  #accountGate.panel{margin:12vh 14px!important;padding:24px!important;border-radius:24px;box-shadow:0 12px 50px #102b4220}
+}
+@media(max-width:360px){#adminApp .topbar{padding:9px}#adminApp .brand{font-size:16px}#adminApp .top-right .btn{font-size:9px;padding:5px}#adminApp .mobile-network{font-size:9px}}
+@media(prefers-reduced-motion:reduce){.innings-progress span,#adminApp .run-btn{transition:none}}
