@@ -61,9 +61,23 @@ function options(select, values, preferred, placeholder) {
   if (values.some(item => item.id === old)) select.value = old;
   else if (values.length && !placeholder) select.value = values[0].id;
 }
+function mobileView(view) {
+  const admin = $("adminApp");
+  if (!["score","teams","fixtures","stats","settings"].includes(view)) return;
+  admin.dataset.mobileView = view;
+  admin.querySelectorAll(".mobile-nav button").forEach(b => { if (b.dataset.mobileTab === view) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
+  if (matchMedia("(max-width: 750px)").matches) window.scrollTo(0,0);
+}
+function initMobileUI() {
+  const indicator = $("mobileNetwork");
+  const refresh = () => { indicator.textContent = navigator.onLine ? "Online" : "Offline"; indicator.classList.toggle("offline", !navigator.onLine); };
+  refresh(); window.addEventListener("online", refresh); window.addEventListener("offline", refresh);
+  $("adminApp").addEventListener("click", e => { const button = e.target.closest("[data-mobile-tab]"); if (button) mobileView(button.dataset.mobileTab); });
+}
 function render() {
   if (!tournament()) { store = empty(); save(); }
   const t = tournament(), ts = teams(), ms = matches();
+  $("mobileTournament").textContent = t.name;
   options($("tournamentSelect"), store.tournaments, t.id);
   $("teamCount").textContent = String(ts.length);
   $("matchCount").textContent = String(ms.length);
@@ -162,9 +176,10 @@ function scoreMarkup(m) {
     '<span class="ball ' + (d.wicket ? "wicket" : d.kind !== "bat" ? "extra" : d.runs === 4 ? "four" : d.runs === 6 ? "six" : "") + '">' + esc(d.symbol) + '</span>').join("") : '<span class="empty-line">Waiting for first delivery</span>') + '</div>';
   const result = m.status === "completed" && m.result ? (m.result.winner ? nameOf(m.result.winner) + " won by " + m.result.margin : m.result.margin) : "";
   const chase = s.target !== null ? '<span class="score-target">TARGET ' + s.target + ' · NEED ' + s.runsNeeded + ' FROM ' + s.ballsLeft + ' BALLS</span>' : '<span class="score-target">' + esc(result || "1ST INNINGS") + '</span>';
+  const progress = Math.min(100, Math.max(0, inn.balls / (m.overs * 6) * 100));
   return '<div class="score-card"><div class="score-top"><span class="score-kicker">' + esc(m.label || tournament()?.name || "CRICKET MATCH") + '</span><span class="score-format">' + m.overs + ' OVERS / INNINGS</span></div>' +
     '<div class="score-center"><div class="score-team"><div class="score-team-name">' + esc(nameOf(inn.batting)) + '</div><div class="score-team-sub">BATTING · INNINGS ' + m.innings.length + '</div></div><div class="score-big">' + inn.runs + '<small>/' + inn.wickets + '</small></div></div>' +
-    '<div class="score-bottom"><span class="score-overs">OVERS <strong>' + oversText(inn.balls) + '</strong> / ' + m.overs + '</span>' + chase + '</div></div>' +
+    '<div class="score-bottom"><span class="score-overs">OVERS <strong>' + oversText(inn.balls) + '</strong> / ' + m.overs + '</span>' + chase + '</div><div class="innings-progress" role="progressbar" aria-label="Legal balls bowled" aria-valuemin="0" aria-valuemax="' + (m.overs * 6) + '" aria-valuenow="' + inn.balls + '"><span style="width:' + progress + '%"></span></div></div>' +
     '<div class="innings-grid"><div class="mini-metric"><b>' + s.rate + '</b><span>CURRENT RUN RATE</span></div><div class="mini-metric"><b>' +
     (s.requiredRate ?? "—") + '</b><span>REQUIRED RUN RATE</span></div><div class="mini-metric"><b>' +
     (inn.extras.wide + inn.extras.noBall + inn.extras.bye + inn.extras.legBye) + '</b><span>EXTRAS</span></div></div>' + trail +
@@ -181,7 +196,7 @@ function renderScore() {
   if (!m) {
     pill.textContent = "No match selected"; pill.className = "pill";
     $("matchScore").className = "score-placeholder";
-    $("matchScore").innerHTML = '<span class="empty-ball">●</span><h3>Ready for the first ball?</h3><p>Add two teams and create a fixture to begin scoring.</p>';
+    $("matchScore").innerHTML = '<span class="empty-ball">●</span><h3>Ready for the first ball?</h3><p>Add two teams and create a fixture to begin scoring.</p><div class="mobile-empty-actions"><button type="button" class="btn btn-primary" data-mobile-tab="fixtures">Create fixture</button><button type="button" class="btn btn-outline" data-mobile-tab="teams">Manage teams</button></div>';
     $("scoringControls").hidden = true;
     return;
   }
@@ -426,14 +441,14 @@ function bindUI() {
       const squads = $("trackPlayers").checked ? { [teamA]:squadFor(teamA).map(({id,name}) => ({id,name})), [teamB]:squadFor(teamB).map(({id,name}) => ({id,name})) } : null;
       const m = createMatch({tournamentId:tournament().id,teamA,teamB,battingFirst:$("battingFirst").value,overs:Number($("overs").value),label:$("matchLabel").value.trim(),squads});
       store.matches.push(m); store.activeMatchId = m.id;
-      $("matchLabel").value = ""; save(); render(); notify("Fixture created. Select Start match to score.");
+      $("matchLabel").value = ""; save(); render(); mobileView("score"); notify("Fixture created. Select Start match to score.");
     } catch (err) { notify(err.message); }
   });
   document.addEventListener("click", e => {
     const targetTournament = e.target.closest('[data-tournament]');
     if (targetTournament) { store.activeTournamentId = targetTournament.dataset.tournament; store.activeMatchId = null; save(); render(); return; }
     const fixture = e.target.closest("[data-match]");
-    if (fixture) { store.activeMatchId = fixture.dataset.match; save(); render(); return; }
+    if (fixture) { store.activeMatchId = fixture.dataset.match; save(); render(); mobileView("score"); return; }
     const run = e.target.closest("[data-kind]");
     if (run) return eventScore(run.dataset.kind, Number(run.dataset.runs));
     const action = e.target.closest("[data-action]");
@@ -488,7 +503,7 @@ function setupPublications(account){
 if (spectator) initDisplay();
 else {
   if (!window.cricboardAccount || window.cricboardAccount.status !== 'approved') throw Error('Approved sign-in required');
-  bindUI(); render();
+  bindUI(); initMobileUI(); render();
   const account=window.cricboardAccount;
   setupPublications(account);
   const scopedStorage={getItem:k=>localStorage.getItem(KEY+':'+k),setItem:(k,v)=>localStorage.setItem(KEY+':'+k,v),removeItem:k=>localStorage.removeItem(KEY+':'+k)};
