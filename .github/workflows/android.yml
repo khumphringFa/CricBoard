@@ -1,0 +1,86 @@
+name: CricBoard Android
+on:
+  pull_request:
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Install Android SDK packages
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - run: gradle -p android :app:assembleDebug :app:lintDebug
+  signed:
+    needs: debug
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify trusted release source
+        run: git merge-base --is-ancestor HEAD origin/main
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Install Android SDK packages
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Build signed APK and AAB
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then echo "Missing repository secret: $name"; exit 1; fi
+          done
+          umask 077
+          export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/cricboard-release.jks"
+          trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          gradle -p android :app:assembleRelease :app:bundleRelease
+          mkdir -p release
+          cp android/app/build/outputs/apk/release/app-release.apk release/CricBoard-v1.0.0.apk
+          cp android/app/build/outputs/bundle/release/app-release.aab release/CricBoard-v1.0.0.aab
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs release/CricBoard-v1.0.0.apk
+          jarsigner -verify release/CricBoard-v1.0.0.aab
+          (cd release && sha256sum *.apk *.aab > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CricBoard-v1.0.0-signed
+          path: release/
+          if-no-files-found: error
+  draft-release:
+    needs: signed
+    if: github.ref == 'refs/tags/v1.0.0'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: CricBoard-v1.0.0-signed
+          path: release
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create v1.0.0 release/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "CricBoard v1.0.0" --notes "Android browser-backed companion. Test sign-in, tournament scoring and central sync on a device before publishing."

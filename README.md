@@ -170,3 +170,9 @@ Central synchronization is required for approved organizers. New and existing or
 Super Admin can review approved organizers, terms acceptance, last synchronization, tournament and match counts, batting and bowling leaders, and download organizer CSV or JSON recovery copies. Records appear after a successful synchronization; local-only offline changes and organizers who have not accepted terms are not automatically accessible. Previously shared copies remain available. This is a latest-copy recovery feature, not a version history. Personal Drive files remain private.
 
 The existing D1 binding is reused; the new table is created on authenticated access. After deployment, test terms acceptance, automatic initial sync, scoring changes, administrator review, restoration and rejection of disable requests with two separate approved accounts.
+
+## Android companion (v1.0.0)
+
+The Android launcher opens the existing CricBoard website in browser Custom Tabs, preserving Google sign-in and the web backend. It is not a standalone native scoring engine or a guaranteed offline cold-start app. Android 8+ is supported; no new OAuth client is needed. Test Google sign-in, scoring, synchronization, exports and device back navigation before public release.
+
+Configure the four repository Actions secrets ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD. Never commit the keystore. Merge the Android changes, then run the **CricBoard Android** workflow from main to obtain signed APK/AAB artifacts. After installation testing, tag main as v1.0.0 to generate a draft GitHub release for review. Preserve the original signing key for updates. Future versions must increment versionCode and update artifact names/tag gate.

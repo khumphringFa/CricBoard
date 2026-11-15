@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">CricBoard</string>
+    <string name="subtitle">Local cricket. Live scores.</string>
+    <string name="organizer">Organizer dashboard</string>
+    <string name="spectator">Browse public tournaments</string>
+    <string name="share">Share CricBoard</string>
+    <string name="note">Opens the secure CricBoard website in your browser. Sign in with Google to manage tournaments. Internet is needed to load the dashboard and synchronize records.</string>
+    <string name="no_browser">Install or enable a web browser to open CricBoard.</string>
+</resources>
