@@ -45,11 +45,11 @@ The primary hosted app runs on Cloudflare Workers. Use this URL on your computer
 
 ## Optional: publish with GitHub Pages
 
-The repository contains an automatic deployment workflow at .github/workflows/pages.yml.
+Cloudflare is the primary host. GitHub Pages is optional and its workflow at `.github/workflows/pages.yml` runs only when manually requested. Normal pushes run the separate test workflow without attempting a Pages deployment.
 
 1. Go to Settings → Pages → Build and deployment.
 2. Select GitHub Actions as the source.
-3. Run the Deploy CricBoard workflow, or push new code to main.
+3. In Actions, select **Deploy CricBoard (optional GitHub Pages)** and click **Run workflow** after Pages is enabled.
 4. Once deployment succeeds, open the site URL shown in the Pages settings or the workflow deployment output.
 
 The expected site address under the default GitHub Pages project domain is:
