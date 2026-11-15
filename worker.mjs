@@ -13,6 +13,23 @@ const json = (value, status=200, headers={}) => Response.json(value,{status,head
 const decode = text => Uint8Array.from(atob(text.replace(/-/g,'+').replace(/_/g,'/')), c=>c.charCodeAt(0));
 const parse = text => JSON.parse(new TextDecoder().decode(decode(text)));
 const hash = async token => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token))),x=>x.toString(16).padStart(2,'0')).join('');
+// Gmail ignores dots in consumer Gmail addresses, not custom Workspace domains.
+export function canonicalEmail(email) {
+  const normalized=email.toLowerCase();
+  const [local,domain]=normalized.split('@');
+  return domain==='gmail.com' ? `${local.replace(/\./g,'')}@gmail.com` : normalized;
+}
+// Call only after validating Google's signed identity token.
+export async function registerVerifiedIdentity(db, identity, adminHash=ADMIN_HASH) {
+  const admin=await hash(canonicalEmail(identity.email))===adminHash || await hash(identity.email)===adminHash;
+  await db.batch(schema.map(sql=>db.prepare(sql)));
+  await db.prepare(`INSERT INTO accounts(sub,email,role,status,created_at) VALUES(?,?,?,?,?)
+    ON CONFLICT(sub) DO UPDATE SET email=excluded.email,
+    role=CASE WHEN excluded.role='admin' THEN 'admin' ELSE accounts.role END,
+    status=CASE WHEN excluded.role='admin' THEN 'approved' ELSE accounts.status END`)
+    .bind(identity.sub,identity.email,admin?'admin':'organizer',admin?'approved':'pending',Date.now()).run();
+  return db.prepare('SELECT sub,email,role,status FROM accounts WHERE sub=?').bind(identity.sub).first();
+}
 const cookie = (token, age) => `__Host-cricboard=${token}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${age}`;
 const sessionToken = req => /(?:^|;\s*)__Host-cricboard=([a-f0-9]{64})(?:;|$)/.exec(req.headers.get('Cookie')||'')?.[1];
 
@@ -39,10 +56,7 @@ export async function handle(request,env) {
   try {
     if(path==='/api/login'&&request.method==='POST') {
       let identity; try {identity=await verifyGoogle((await request.json()).credential);} catch {return json({error:'Google identity could not be verified'},401);}
-      const admin=await hash(identity.email)===(env.ADMIN_EMAIL_HASH||ADMIN_HASH);
-      await db.batch(schema.map(sql=>db.prepare(sql)));
-      await db.prepare('INSERT INTO accounts(sub,email,role,status,created_at) VALUES(?,?,?,?,?) ON CONFLICT(sub) DO UPDATE SET email=excluded.email').bind(identity.sub,identity.email,admin?'admin':'organizer',admin?'approved':'pending',Date.now()).run();
-      const account=await db.prepare('SELECT sub,email,role,status FROM accounts WHERE sub=?').bind(identity.sub).first();
+      const account=await registerVerifiedIdentity(db,identity,env.ADMIN_EMAIL_HASH||ADMIN_HASH);
       const token=Array.from(crypto.getRandomValues(new Uint8Array(32)),x=>x.toString(16).padStart(2,'0')).join('');
       await db.prepare('DELETE FROM sessions WHERE expires<?').bind(Date.now()).run();
       await db.prepare('INSERT INTO sessions(hash,sub,expires) VALUES(?,?,?)').bind(await hash(token),identity.sub,Date.now()+86400000).run();

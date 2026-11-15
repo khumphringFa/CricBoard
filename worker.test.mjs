@@ -2,7 +2,24 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
-import {handle,verifyGoogle} from './worker.mjs';
+import {handle,verifyGoogle,canonicalEmail,registerVerifiedIdentity} from './worker.mjs';
+
+test('verified Gmail aliases promote only the configured administrator and retain data',async()=>{
+  const sql=new DatabaseSync(':memory:'); sql.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));
+  const DB={prepare:statement=>({statement,bind:(...args)=>({first:async()=>sql.prepare(statement).get(...args),run:async()=>sql.prepare(statement).run(...args)})}),batch:async entries=>{for(const entry of entries)sql.exec(entry.statement);}};
+  const configured='sampleadmin@gmail.com';
+  const adminHash=Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(configured))).toString('hex');
+  sql.prepare('INSERT INTO accounts VALUES(?,?,?,?,?)').run('owner','sample.admin@gmail.com','organizer','pending',100);
+  sql.prepare('INSERT INTO snapshots VALUES(?,?,?)').run('owner','revision','{}');
+  const owner=await registerVerifiedIdentity(DB,{sub:'owner',email:'sample.admin@gmail.com'},adminHash);
+  assert.equal(owner.role,'admin'); assert.equal(owner.status,'approved'); assert.equal(owner.email,'sample.admin@gmail.com');
+  assert.equal(sql.prepare('SELECT revision FROM snapshots WHERE sub=?').get('owner').revision,'revision');
+  assert.equal((await registerVerifiedIdentity(DB,{sub:'other',email:'sample.admin@example.com'},adminHash)).status,'pending');
+  sql.prepare("UPDATE accounts SET status='suspended' WHERE sub='other'").run();
+  assert.equal((await registerVerifiedIdentity(DB,{sub:'other',email:'sample.admin@example.com'},adminHash)).status,'suspended');
+  assert.equal(canonicalEmail('Sample.Admin@gmail.com'),configured);
+  assert.equal(canonicalEmail('Sample.Admin@example.com'),'sample.admin@example.com');
+});
 
 test('Google identity verifies signature, audience and verified email',async()=>{
   const keys=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']);
