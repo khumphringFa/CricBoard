@@ -1,4 +1,4 @@
-import { makeId, createMatch, startMatch, applyDelivery, undoDelivery, advanceInnings, endInnings, summary, standings, oversText, lastOverDeliveries } from "./engine.mjs";
+import { makeId, createMatch, startMatch, applyDelivery, undoDelivery, advanceInnings, endInnings, summary, standings, oversText, lastOverDeliveries, selectPlayers, inningsScorecard, tournamentPlayerStats } from "./engine.mjs";
 import { initCloud, validateStore } from "./cloud.mjs";
 
 const KEY = "cricboard-tournaments-v1";
@@ -12,6 +12,7 @@ function read() {
   } catch { return empty(); }
 }
 let store = read();
+store.players ||= [];
 let cloud = null;
 let peer = null;
 let liveMatchId = null;
@@ -46,8 +47,8 @@ const statusLabel = status => ({ scheduled: "Scheduled", live: "● Live", break
 function updateMatch(transform) {
   const idx = store.matches.findIndex(m => m.id === store.activeMatchId);
   if (idx < 0) return;
-  try { store.matches[idx] = transform(store.matches[idx]); save(); render(); broadcast(); }
-  catch (err) { notify(err.message || "Could not update score"); }
+  try { store.matches[idx] = transform(store.matches[idx]); save(); render(); broadcast(); return true; }
+  catch (err) { notify(err.message || "Could not update score"); return false; }
 }
 function options(select, values, preferred, placeholder) {
   const old = preferred ?? select.value;
@@ -80,10 +81,62 @@ function render() {
   renderScore();
   renderPoints(ts, ms);
   renderShare();
+  renderRoster(); renderTournamentStats();
 }
 function updateBattingFirst(preferred) {
   const list = [$("teamA").value, $("teamB").value].filter(Boolean).map(id => ({id,name:nameOf(id)}));
   options($("battingFirst"), list, preferred);
+}
+const squadFor = team => (store.players || []).filter(p => p.teamId === team && p.tournamentId === tournament()?.id);
+function renderRoster() {
+  options($("rosterTeam"), teams(), $("rosterTeam").value, 'Choose team');
+  const roster = squadFor($("rosterTeam").value);
+  $("rosterList").innerHTML = roster.length ? roster.map((p, i) => '<div class="team-chip"><span class="counter">' + (i + 1) + '</span><span>' + esc(p.name) + '</span></div>').join('') : '<p class="hint">Choose a team and add its playing squad.</p>';
+  $("tournamentsOverview").innerHTML = store.tournaments.map(t => '<button class="match-item" data-tournament="' + esc(t.id) + '"><span class="match-item-body"><strong>' + esc(t.name) + '</strong><small>' + store.teams.filter(x => x.tournamentId === t.id).length + ' teams · ' + store.matches.filter(x => x.tournamentId === t.id).length + ' matches</small></span></button>').join('');
+}
+function statsTable(headers, rows) {
+  return '<div class="table-wrap"><table class="standings"><thead><tr>' + headers.map(h => '<th>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>' + rows.map(row => '<tr>' + row.map(cell => '<td>' + esc(cell) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
+}
+function scorecardMarkup(m) {
+  if (!m.playerMode) return '<p class="hint">Team totals only: this match was created without player tracking. Add squads and enable player statistics for new fixtures.</p>';
+  return m.innings.map((inn, index) => {
+    const card = inningsScorecard(m, inn);
+    const names = new Map(m.squads[inn.bowling].map(p => [p.id, p.name]));
+    const dismissal = p => !p.entered ? 'Did not bat' : p.dismissal ? p.dismissal.type + (p.dismissal.bowler ? ' · ' + names.get(p.dismissal.bowler) : '') : 'Not out';
+    return '<details class="scorecard" open><summary>Innings ' + (index + 1) + ' · ' + esc(nameOf(inn.batting)) + ' · ' + inn.runs + '/' + inn.wickets + '</summary><h3>Batting</h3>' +
+      statsTable(['Batter', 'Status', 'R', 'B', '4s', '6s', 'SR'], card.batting.map(p => [p.name + (inn.lineup?.striker === p.id ? ' *' : ''), dismissal(p), p.runs, p.balls, p.fours, p.sixes, p.strikeRate])) +
+      '<h3>Bowling</h3>' + statsTable(['Bowler', 'O', 'M', 'R', 'W', 'Wd', 'Nb', 'Econ'], card.bowling.map(p => [p.name, p.overs, p.maidens, p.runs, p.wickets, p.wides, p.noBalls, p.economy])) +
+      '<p class="hint">Extras: Wd ' + inn.extras.wide + ' · Nb ' + inn.extras.noBall + ' · B ' + inn.extras.bye + ' · Lb ' + inn.extras.legBye + '</p></details>';
+  }).join('');
+}
+function renderPlayerControls(m) {
+  if (!m.playerMode || m.status !== 'live') return;
+  const inn = m.innings.at(-1), lineup = inn.lineup;
+  const out = new Set(inn.deliveries.filter(d => d.dismissed).map(d => d.dismissed));
+  const selector = (key, label, values) => '<label class="label" for="pick-' + key + '">' + label + '</label><select class="field" id="pick-' + key + '" ' + (lineup[key] ? 'disabled' : '') + '><option value="">Choose ' + label.toLowerCase() + '</option>' + values.map(p => '<option value="' + esc(p.id) + '" ' + (lineup[key] === p.id ? 'selected' : '') + '>' + esc(p.name) + '</option>').join('') + '</select>';
+  const batters = m.squads[inn.batting].filter(p => !out.has(p.id));
+  $("playerControls").innerHTML = '<form id="creaseForm" class="crease-form"><strong>Players at the crease' + (lineup.freeHit ? ' · FREE HIT' : '') + '</strong>' +
+    '<div class="form-grid">' + selector('striker', 'Striker', batters) + selector('nonStriker', 'Non-striker', batters) + '</div>' +
+    selector('bowler', 'Bowler', m.squads[inn.bowling].filter(p => p.id !== lineup.lastBowler)) +
+    '<div class="cloud-buttons"><button class="btn btn-primary" type="submit">Set players</button><button class="btn btn-light" data-action="swap" type="button">Swap strike</button></div><p class="hint">Odd runs and over ends rotate strike automatically. Select a new bowler after each over and the next batter after a wicket.</p></form>';
+  $("creaseForm").onsubmit = event => { event.preventDefault(); updateMatch(match => selectPlayers(match, {striker:$("pick-striker").value, nonStriker:$("pick-nonStriker").value, bowler:$("pick-bowler").value})); };
+}
+function renderTournamentStats() {
+  const data = tournamentPlayerStats(store.matches, tournament()?.id);
+  const batting = [...data].filter(p => p.innings).sort((a,b) => b.runs-a.runs || a.name.localeCompare(b.name));
+  const bowling = [...data].filter(p => p.bowlingBalls || p.conceded).sort((a,b) => b.wickets-a.wickets || a.conceded-b.conceded);
+  $("playerLeaders").innerHTML = '<p class="hint">' + esc(tournament()?.name) + ' only · Includes live and completed player-tracked matches. Older team-only results do not invent player statistics.</p>' +
+    (data.length ? '<h3>Batting leaders</h3>' + statsTable(['Player / team','Inn','R','B','4s','6s','HS','Avg','SR'], batting.map(p => [p.name+' / '+nameOf(p.team),p.innings,p.runs,p.balls,p.fours,p.sixes,p.highest,p.average,p.strikeRate])) +
+      '<h3>Bowling leaders</h3>' + statsTable(['Player / team','O','M','R','W','Econ'], bowling.map(p => [p.name+' / '+nameOf(p.team),oversText(p.bowlingBalls),p.maidens,p.conceded,p.wickets,p.economy])) : '<p class="empty-line">Add squads, create a player-tracked match, and start scoring.</p>');
+}
+function openWicket() {
+  const m = current();
+  if (!m?.playerMode) return eventScore('wicket', 0);
+  const inn = m.innings.at(-1), l = inn.lineup;
+  if (!l.striker || !l.nonStriker || !l.bowler) return notify('Set both batters and the bowler first.');
+  options($("dismissedPlayer"), m.squads[inn.batting].filter(p => [l.striker, l.nonStriker].includes(p.id)), l.striker);
+  $("dismissalType").value = l.freeHit ? 'runOut' : 'bowled'; $("wicketKind").value = 'bat'; $("wicketRuns").value = '0'; $("survivorFaces").value = 'new';
+  $("dismissalDialog").showModal();
 }
 function renderMatches(ms) {
   const ordered = [...ms].reverse();
@@ -116,6 +169,8 @@ function renderScore() {
   const pill = $("matchStatePill");
   const actions = $("matchActions");
   actions.innerHTML = "";
+  $("playerControls").innerHTML = "";
+  $("matchScorecard").innerHTML = "";
   if (!m) {
     pill.textContent = "No match selected"; pill.className = "pill";
     $("matchScore").className = "score-placeholder";
@@ -136,6 +191,8 @@ function renderScore() {
     if (m.status === "completed") actions.innerHTML = '<button class="btn btn-light" data-action="undo">↶ Correct last ball</button>';
   }
   $("scoringControls").hidden = m.status !== "live";
+  renderPlayerControls(m);
+  $("matchScorecard").innerHTML = scorecardMarkup(m);
 }
 function renderPoints(ts, ms) {
   if (!ts.length) { $("pointsTable").innerHTML = '<p class="empty-line">Add teams to see the table.</p>'; return; }
@@ -155,7 +212,7 @@ function renderShare(message) {
   $("openLocal").disabled = !current();
 }
 function eventScore(kind, runs) {
-  updateMatch(m => applyDelivery(m, {kind, runs}));
+  updateMatch(m => applyDelivery(m, {kind, runs, ...(kind === 'noBall' ? {runType:$("noBallRunType").value} : {})}));
 }
 function packetFor(matchId) {
   const m = store.matches.find(item => item.id === matchId);
@@ -240,6 +297,13 @@ function renderDisplay(packet) {
     '<div class="display-vs"><div class="display-side"><div class="display-team-name">' + esc(packet.teamA) + '</div><div class="display-score">' + displayScore(a) + '</div><div class="display-team-sub">' + overLine(a) + (s.current?.batting === m.teamA && m.status === "live" ? " · BATTING" : "") + '</div></div>' +
     '<div class="display-versus">VS</div><div class="display-side"><div class="display-team-name">' + esc(packet.teamB) + '</div><div class="display-score">' + displayScore(b) + '</div><div class="display-team-sub">' + overLine(b) + (s.current?.batting === m.teamB && m.status === "live" ? " · BATTING" : "") + '</div></div></div>' +
     '<div class="display-highlights"><div><strong>' + (s.current ? oversText(s.current.balls) : "0.0") + '</strong><span>Current overs</span></div><div><strong>' + m.overs + '</strong><span>Overs limit</span></div><div><strong>' + s.rate + '</strong><span>Run rate</span></div><div><strong>' + (s.requiredRate ?? "—") + '</strong><span>Required rate</span></div></div><div class="display-message">' + esc(msg) + '</div>';
+  if (m.playerMode && s.current) {
+    const card = inningsScorecard(m, s.current), line = s.current.lineup;
+    const batters = card.batting.filter(p => [line.striker,line.nonStriker].includes(p.id));
+    const bowler = card.bowling.find(p => p.id === line.bowler);
+    $("displayContent").innerHTML += '<div class="display-player-strip">' + batters.map(p => '<span>' + esc(p.name) + (p.id === line.striker ? ' *' : '') + ' · ' + p.runs + ' (' + p.balls + ')</span>').join('') +
+      (bowler ? '<span>Bowling: ' + esc(bowler.name) + ' · ' + bowler.wickets + '/' + bowler.runs + ' (' + bowler.overs + ')</span>' : '<span>Selecting next bowler</span>') + '</div>';
+  }
   $("displayUpdated").textContent = "Updated " + new Date(packet.sentAt || Date.now()).toLocaleTimeString();
   document.title = packet.teamA + " vs " + packet.teamB + " · CricBoard";
 }
@@ -301,6 +365,30 @@ function connectToHost() {
   } catch { showLost("Unable to connect. Retrying…"); }
 }
 function bindUI() {
+  $("rosterTeam").addEventListener('change', renderRoster);
+  $("playerForm").addEventListener('submit', event => {
+    event.preventDefault();
+    const teamId = $("rosterTeam").value;
+    if (!teams().some(t => t.id === teamId)) return notify('Choose a team for these players.');
+    const names = $("playerNames").value.split(/[\n,]+/).map(n => n.trim()).filter(Boolean);
+    const existing = squadFor(teamId), seen = new Set(existing.map(p => p.name.toLowerCase()));
+    if (!names.length || existing.length + names.length > 11) return notify('Each team can have 2–11 players. Maximum 11 in the playing squad.');
+    for (const name of names) {
+      if (name.length > 60 || seen.has(name.toLowerCase())) return notify('Use unique player names of up to 60 characters within this team.');
+      seen.add(name.toLowerCase());
+    }
+    store.players ||= []; store.players.push(...names.map(name => ({id:makeId(), name, teamId, tournamentId:tournament().id})));
+    $("playerNames").value = ''; save(); render(); notify('Players added. New fixtures will use this squad.');
+  });
+  $("cancelWicket").onclick = () => $("dismissalDialog").close();
+  $("dismissalForm").onsubmit = event => {
+    event.preventDefault();
+    const kind = $("wicketKind").value;
+    const success = updateMatch(m => applyDelivery(m, {kind, runs:Number($("wicketRuns").value), dismissal:$("dismissalType").value,
+      dismissed:$("dismissedPlayer").value, survivorFaces:$("survivorFaces").value === 'survivor',
+      ...(kind === 'noBall' ? {runType:$("wicketRunType").value} : {})}));
+    if (success) $("dismissalDialog").close();
+  };
   $("tournamentSelect").addEventListener("change", e => {
     store.activeTournamentId = e.target.value; store.activeMatchId = null; save(); render();
   });
@@ -325,12 +413,16 @@ function bindUI() {
   $("matchForm").addEventListener("submit", e => {
     e.preventDefault();
     try {
-      const m = createMatch({tournamentId:tournament().id,teamA:$("teamA").value,teamB:$("teamB").value,battingFirst:$("battingFirst").value,overs:Number($("overs").value),label:$("matchLabel").value.trim()});
+      const teamA = $("teamA").value, teamB = $("teamB").value;
+      const squads = $("trackPlayers").checked ? { [teamA]:squadFor(teamA).map(({id,name}) => ({id,name})), [teamB]:squadFor(teamB).map(({id,name}) => ({id,name})) } : null;
+      const m = createMatch({tournamentId:tournament().id,teamA,teamB,battingFirst:$("battingFirst").value,overs:Number($("overs").value),label:$("matchLabel").value.trim(),squads});
       store.matches.push(m); store.activeMatchId = m.id;
       $("matchLabel").value = ""; save(); render(); notify("Fixture created. Select Start match to score.");
     } catch (err) { notify(err.message); }
   });
   document.addEventListener("click", e => {
+    const targetTournament = e.target.closest('[data-tournament]');
+    if (targetTournament) { store.activeTournamentId = targetTournament.dataset.tournament; store.activeMatchId = null; save(); render(); return; }
     const fixture = e.target.closest("[data-match]");
     if (fixture) { store.activeMatchId = fixture.dataset.match; save(); render(); return; }
     const run = e.target.closest("[data-kind]");
@@ -343,7 +435,8 @@ function bindUI() {
     if (cmd === "undo") return updateMatch(undoDelivery);
     if (cmd === "next") return updateMatch(advanceInnings);
     if (cmd === "end") { if (confirm("End the current innings now?")) updateMatch(endInnings); }
-    if (cmd === "wicket") return eventScore("wicket", 0);
+    if (cmd === "wicket") return openWicket();
+    if (cmd === 'swap') return updateMatch(m => selectPlayers(m, {swap:true}));
   });
   $("startLive").addEventListener("click", startLive);
   $("stopLive").addEventListener("click", () => { stopLive(); notify("Temporary link has been stopped."); });
@@ -365,13 +458,13 @@ else {
       const restored = validateStore(input);
       // Persist successfully before changing the score screen or stopping a broadcast.
       localStorage.setItem(KEY, JSON.stringify(restored));
-      stopLive(); store = restored; render();
+      stopLive(); store = restored; store.players ||= []; render();
     }
   });
   window.addEventListener('storage', event => {
     if (event.key !== KEY) return;
     // Keep another scorer tab from overwriting this tab's newer scores.
-    store = read(); render(); broadcast(); cloud.changed();
+    store = read(); store.players ||= []; render(); broadcast(); cloud.changed();
   });
 }
 

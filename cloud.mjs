@@ -1,6 +1,6 @@
 // Private Google Drive snapshots. Every write creates a new file: concurrent
 // devices can branch, but can never overwrite one another's score records.
-import { recalc, finishResult } from './engine.mjs';
+import { recalc, finishResult, deliveryInfo, wicketLimit, validatePlayerMatch } from './engine.mjs';
 
 export const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 export const MAX_BYTES = 10 * 1024 * 1024;
@@ -30,6 +30,11 @@ export function validateStore(input) {
   if (!tournaments.has(data.activeTournamentId) || (data.activeMatchId !== null && !matches.has(data.activeMatchId))) fail();
   for (const t of data.tournaments) if (!text(t.name, 64)) fail();
   for (const t of data.teams) if (!text(t.name, 45) || !tournaments.has(t.tournamentId)) fail();
+  if (data.players !== undefined) {
+    if (!Array.isArray(data.players)) fail(); unique(data.players);
+    for (const p of data.players) if (!text(p.name, 60) || !teams.has(p.teamId) ||
+      !data.teams.some(t => t.id === p.teamId && t.tournamentId === p.tournamentId)) fail();
+  }
   const teamById = new Map(data.teams.map(t => [t.id, t]));
   for (const m of data.matches) {
     if (!tournaments.has(m.tournamentId) || !teams.has(m.teamA) || !teams.has(m.teamB) || m.teamA === m.teamB ||
@@ -51,10 +56,17 @@ export function validateStore(input) {
       let balls = 0, wickets = 0, runs = 0;
       for (const d of inn.deliveries) {
         if (balls >= m.overs * 6 || wickets >= 10 || (index === 1 && runs > m.innings[0].runs)) fail();
-        balls += !['wide', 'noBall'].includes(d.kind) ? 1 : 0;
-        wickets += d.kind === 'wicket' ? 1 : 0;
-        runs += Number(d.runs) + (['wide', 'noBall'].includes(d.kind) ? 1 : 0);
+        const info = deliveryInfo(d);
+        balls += info.legal ? 1 : 0;
+        wickets += info.wicket ? 1 : 0;
+        runs += info.total;
       }
+    }
+    if (m.playerMode) {
+      try {
+        validatePlayerMatch(m);
+        for (const inn of m.innings) if (inn.wickets > wicketLimit(m, inn.batting)) fail();
+      } catch { fail(); }
     }
     if (m.status === 'completed') {
       const result = finishResult(m);

@@ -38,6 +38,14 @@
             <button class="btn btn-small btn-ghost" type="submit">+ Add</button>
           </form>
         </section>
+        <section class="side-section" aria-label="Team players">
+          <div class="section-label"><span>TEAM PLAYERS</span></div>
+          <label for="rosterTeam" class="label">Team squad</label><select id="rosterTeam" class="field"></select>
+          <div id="rosterList" class="team-list"></div>
+          <form id="playerForm" class="stacked-form"><label for="playerNames" class="label">Add players (one per line)</label><textarea id="playerNames" class="field" rows="3" maxlength="900" placeholder="Player name" required></textarea><button class="btn btn-ghost" type="submit">Add players</button></form>
+          <p class="hint">2–11 players per team. Add the playing squad before creating a player-tracked match.</p>
+        </section>
+        <details class="side-section"><summary class="label">All tournaments</summary><div id="tournamentsOverview" class="team-list"></div></details>
         <div class="sidebar-note"><span class="note-icon">↗</span><div><strong>Built for grassroots cricket</strong><p>Short-format matches, village cups, school games and local leagues.</p></div></div>
       </aside>
       <main class="main-content">
@@ -49,6 +57,8 @@
               <div class="panel-title"><div><span class="overline">LIVE SCORING</span><h2>Match scoreboard</h2></div><span id="matchStatePill" class="pill">No match selected</span></div>
               <div id="matchScore" class="score-placeholder"><span class="empty-ball">●</span><h3>Ready for the first ball?</h3><p>Add two teams and create a fixture to begin scoring.</p></div>
               <div id="scoringControls" class="controls" hidden>
+                <div id="playerControls"></div>
+                <label class="label" for="noBallRunType">When recording a no-ball, additional runs are</label><select id="noBallRunType" class="field"><option value="bat">Off the bat</option><option value="bye">Byes</option><option value="legBye">Leg-byes</option></select>
                 <div class="controls-title"><strong>Record a delivery</strong><span>Tap once per ball</span></div>
                 <div class="run-grid">
                   <button class="run-btn" data-kind="bat" data-runs="0">0<span>DOT</span></button>
@@ -63,11 +73,13 @@
                 <p class="hint">Wides and no-balls add a one-run penalty and do not use a legal ball. Basic wicket scoring records a legal dot ball.</p>
               </div>
               <div id="matchActions" class="match-actions"></div>
+              <div id="matchScorecard"></div>
             </section>
             <section class="panel">
               <div class="panel-title"><div><span class="overline">FIXTURES</span><h2>Matches</h2></div><span class="counter" id="matchCount">0</span></div>
               <div id="matchesList" class="match-list"></div>
             </section>
+            <section class="panel"><div class="panel-title"><div><span class="overline">TOURNAMENT STATISTICS</span><h2>Player leaderboards</h2></div></div><div id="playerLeaders"></div></section>
           </div>
           <div class="secondary-column">
             <section class="panel cloud-panel" aria-labelledby="cloudTitle">
@@ -97,6 +109,7 @@
             <section class="panel">
               <div class="panel-title"><div><span class="overline">NEW FIXTURE</span><h2>Create a match</h2></div><span class="decor-icon">＋</span></div>
               <form id="matchForm" class="stacked-form">
+                <label class="cloud-auto"><input id="trackPlayers" type="checkbox" checked> Record batter &amp; bowler statistics</label><p class="hint">Uses the team's current playing squad (2–11 players). Existing matches keep their original totals.</p>
                 <label class="label" for="matchLabel">Match name <span class="muted">(optional)</span></label><input id="matchLabel" class="field" name="label" placeholder="Final / Match 1" maxlength="80">
                 <label class="label" for="teamA">Team A</label><select id="teamA" class="field" required></select>
                 <label class="label" for="teamB">Team B</label><select id="teamB" class="field" required></select>
@@ -131,5 +144,17 @@
     </div>
   </div>
   <div id="toast" role="status" aria-live="polite" class="toast" hidden></div>
+  <dialog id="dismissalDialog" class="wicket-dialog" aria-labelledby="wicketTitle">
+    <form id="dismissalForm" class="stacked-form"><h2 id="wicketTitle">Record a wicket</h2>
+      <label class="label" for="dismissalType">Dismissal</label><select id="dismissalType" class="field"><option value="bowled">Bowled</option><option value="caught">Caught</option><option value="lbw">LBW</option><option value="stumped">Stumped</option><option value="hitWicket">Hit wicket</option><option value="runOut">Run out (no bowler wicket)</option></select>
+      <label class="label" for="dismissedPlayer">Dismissed batter</label><select id="dismissedPlayer" class="field"></select>
+      <label class="label" for="wicketKind">Delivery type</label><select id="wicketKind" class="field"><option value="bat">Normal delivery</option><option value="wide">Wide</option><option value="noBall">No-ball</option><option value="bye">Bye</option><option value="legBye">Leg-bye</option></select>
+      <label class="label" for="wicketRuns">Completed runs (run out only; excludes penalty)</label><input id="wicketRuns" class="field" type="number" min="0" max="6" value="0" required>
+      <label class="label" for="wicketRunType">No-ball runs from</label><select id="wicketRunType" class="field"><option value="bat">Bat</option><option value="bye">Byes</option><option value="legBye">Leg-byes</option></select>
+      <label class="label" for="survivorFaces">For a run out, next striker before the over-end swap</label><select id="survivorFaces" class="field"><option value="new">New batter</option><option value="survivor">Surviving batter</option></select>
+      <p class="hint">Record only completed runs, then choose the correct ends as agreed with the umpire. A run out is never credited to the bowler.</p>
+      <div class="cloud-buttons"><button class="btn btn-danger" type="submit">Save wicket</button><button id="cancelWicket" class="btn btn-light" type="button">Cancel</button></div>
+    </form>
+  </dialog>
 </body>
 </html>
