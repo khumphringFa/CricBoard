@@ -87,18 +87,30 @@ jobs:
           name: CricBoard-v1.1.0-signed
           path: release/
           if-no-files-found: error
-  draft-release:
+  publish-release:
     needs: signed
-    if: github.ref == 'refs/tags/v1.1.0'
+    if: github.ref == 'refs/tags/v1.1.0' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: CricBoard-v1.1.0-signed
           path: release
-      - name: Create draft release
+      - name: Publish signed APKs
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create v1.1.0 release/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "CricBoard v1.1.0" --notes "Android bundled scoring app. Test sign-in, tournament scoring and central sync on a device before publishing."
+        run: |
+          set -euo pipefail
+          (cd release && sha256sum -c SHA256SUMS.txt)
+          if ! gh release view v1.0.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            mkdir -p legacy
+            gh run download 43729676898 --repo "$GITHUB_REPOSITORY" --name CricBoard-v1.0.0-signed --dir legacy
+            (cd legacy && sha256sum -c SHA256SUMS.txt)
+            gh release create v1.0.0 legacy/* --repo "$GITHUB_REPOSITORY" --target ab742574d542e6aaed84a91c79632b190dc3ac01 --title "CricBoard v1.0.0" --notes "Original signed Android APK." --latest=false
+          fi
+          if ! gh release view v1.1.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create v1.1.0 release/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "CricBoard v1.1.0" --notes "Signed Android APK with bundled scoring, offline data and automatic sync. Device testing recommended." --prerelease
+          fi
