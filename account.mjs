@@ -9,6 +9,12 @@ async function logout(){try{await api('logout','POST');location.replace(location
 async function show(account){
   $('accountLogout').hidden=false; $('googleLogin').hidden=true;
   if(account.status!=='approved'){status(account.email+' — '+(account.status==='pending'?'Awaiting administrator approval. Refresh after approval.':'Account suspended.'));return;}
+  const terms=await api('terms');
+  if(!terms.accepted){
+    $('organizerTerms').hidden=false;status('Review the organizer terms to continue.');
+    $('acceptTerms').onclick=async()=>{try{if(!$('termsAgree').checked)return;await api('terms','POST',{version:terms.version,accept:true});$('organizerTerms').hidden=true;await show(account);}catch(e){status(e.message);}};
+    return;
+  }
   // Legacy scores can only be claimed by the designated administrator and only explicitly.
   const key='cricboard-tournaments-v1:'+account.sub;
   if(account.role==='admin'&&!localStorage.getItem(key)&&localStorage.getItem('cricboard-tournaments-v1')&&confirm('Import your existing local tournament records into this administrator account? The original copy will remain untouched.')) localStorage.setItem(key,localStorage.getItem('cricboard-tournaments-v1'));

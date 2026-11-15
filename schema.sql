@@ -4,3 +4,4 @@ CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires);
 CREATE TABLE IF NOT EXISTS snapshots (sub TEXT PRIMARY KEY REFERENCES accounts(sub), revision TEXT NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS published_tournaments (slug TEXT PRIMARY KEY, sub TEXT NOT NULL REFERENCES accounts(sub), tournament_id TEXT NOT NULL, name TEXT NOT NULL, data TEXT NOT NULL, visible INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL, UNIQUE(sub,tournament_id));
 CREATE TABLE IF NOT EXISTS central_records (sub TEXT PRIMARY KEY REFERENCES accounts(sub), revision TEXT NOT NULL, enabled INTEGER NOT NULL, updated_at INTEGER NOT NULL, data TEXT NOT NULL, summary TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS organizer_terms (sub TEXT PRIMARY KEY REFERENCES accounts(sub), version TEXT NOT NULL, accepted_at INTEGER NOT NULL);
