@@ -1,5 +1,6 @@
 import { validateStore } from './cloud.mjs';
 import { publicTournament } from './public-data.mjs';
+import { centralStore, centralSummary } from './central-data.mjs';
 
 const CLIENT = '342863663518-8raaefvf2qt3skk5jfbego0vfob8441f.apps.googleusercontent.com';
 // Bootstrap identity fingerprint, not a credential; verified Google email is required.
@@ -34,6 +35,7 @@ export async function registerVerifiedIdentity(db, identity, adminHash=ADMIN_HAS
 const cookie = (token, age) => `__Host-cricboard=${token}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${age}`;
 const sessionToken = req => /(?:^|;\s*)__Host-cricboard=([a-f0-9]{64})(?:;|$)/.exec(req.headers.get('Cookie')||'')?.[1];
 const publicSchema = 'CREATE TABLE IF NOT EXISTS published_tournaments (slug TEXT PRIMARY KEY, sub TEXT NOT NULL REFERENCES accounts(sub), tournament_id TEXT NOT NULL, name TEXT NOT NULL, data TEXT NOT NULL, visible INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL, UNIQUE(sub,tournament_id))';
+const centralSchema = 'CREATE TABLE IF NOT EXISTS central_records (sub TEXT PRIMARY KEY REFERENCES accounts(sub), revision TEXT NOT NULL, enabled INTEGER NOT NULL, updated_at INTEGER NOT NULL, data TEXT NOT NULL, summary TEXT NOT NULL)';
 
 export async function verifyGoogle(token, fetcher=fetch, now=Date.now()) {
   if(typeof token!=='string'||token.length>10000) throw Error('Invalid Google credential');
@@ -86,6 +88,38 @@ export async function handle(request,env) {
     if(!account) return json({error:'Sign in required'},401);
     if(path==='/api/me'&&request.method==='GET') return json(account);
     if(account.status!=='approved') return json({error:'Administrator approval required'},403);
+    if(path==='/api/central'){
+      await db.prepare(centralSchema).run();
+      if(request.method==='GET'){
+        const row=await db.prepare('SELECT revision,enabled,updated_at,data FROM central_records WHERE sub=?').bind(account.sub).first();
+        return json(row?{revision:row.revision,enabled:Boolean(row.enabled),updatedAt:row.updated_at,data:JSON.parse(row.data)}:{revision:null,enabled:false,updatedAt:null,data:null});
+      }
+      if(request.method==='DELETE'){
+        await db.prepare('UPDATE central_records SET enabled=0,revision=? WHERE sub=?').bind(crypto.randomUUID(),account.sub).run();return json({ok:true});
+      }
+      if(request.method==='POST'||request.method==='PUT'){
+        const raw=await request.text();if(new TextEncoder().encode(raw).length>900000)return json({error:'Central copy too large; retain your Drive backup'},413);
+        let payload,data;try{payload=JSON.parse(raw);data=centralStore(payload.data);}catch{return json({error:'Invalid tournament records'},400);}
+        if(request.method==='POST'&&payload.consent!==true)return json({error:'Explicit central sharing consent required'},400);
+        const rev=crypto.randomUUID(),now=Date.now(),serialized=JSON.stringify(data),summary=JSON.stringify(centralSummary(data));
+        if(new TextEncoder().encode(serialized+summary).length>930000)return json({error:'Central copy too large'},413);
+        const result=request.method==='POST'&&payload.revision===null?await db.prepare('INSERT OR IGNORE INTO central_records(sub,revision,enabled,updated_at,data,summary) VALUES(?,?,1,?,?,?)').bind(account.sub,rev,now,serialized,summary).run():await db.prepare('UPDATE central_records SET revision=?,enabled=1,updated_at=?,data=?,summary=? WHERE sub=? AND revision=? AND (enabled=1 OR ?=1)').bind(rev,now,serialized,summary,account.sub,payload.revision,request.method==='POST'?1:0).run();
+        if(!result.meta.changes)return json({error:'Central copy changed or sharing was disabled. Refresh and reconcile before syncing.'},409);
+        return json({revision:rev,enabled:true,updatedAt:now});
+      }
+    }
+    if(path==='/api/central-admin'&&request.method==='GET'&&account.role==='admin'){
+      await db.prepare(centralSchema).run();
+      const offset=Math.min(100000,Math.max(0,Number.parseInt(url.searchParams.get('offset')||'0',10)||0));
+      const rows=(await db.prepare('SELECT a.sub,a.email,a.status,c.updated_at,c.summary FROM accounts a LEFT JOIN central_records c ON c.sub=a.sub AND c.enabled=1 WHERE a.status=\'approved\' ORDER BY a.sub LIMIT 50 OFFSET ?').bind(offset).all()).results;
+      return json(rows.map(r=>({sub:r.sub,email:r.email,updatedAt:r.updated_at??null,summary:r.summary?JSON.parse(r.summary):null})));
+    }
+    if(path.startsWith('/api/central-admin/')&&request.method==='GET'&&account.role==='admin'){
+      await db.prepare(centralSchema).run();
+      const sub=decodeURIComponent(path.slice('/api/central-admin/'.length));
+      const row=await db.prepare("SELECT a.email,c.updated_at,c.data FROM central_records c JOIN accounts a ON a.sub=c.sub WHERE c.sub=? AND c.enabled=1 AND a.status='approved'").bind(sub).first();
+      return row?json({email:row.email,updatedAt:row.updated_at,data:JSON.parse(row.data)}):json({error:'No shared records available'},404);
+    }
     if(path==='/api/publications') {
       await db.prepare(publicSchema).run();
       if(request.method==='GET')return json((await db.prepare('SELECT slug,tournament_id,visible,updated_at FROM published_tournaments WHERE sub=?').bind(account.sub).all()).results);

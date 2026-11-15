@@ -2,7 +2,7 @@ const $=id=>document.getElementById(id);
 const remote=new URLSearchParams(location.search).has('display');
 const api=async(path,method='GET',data)=>{
   const res=await fetch('/api/'+path,{method,credentials:'same-origin',headers:data?{'Content-Type':'application/json'}:{},body:data?JSON.stringify(data):undefined,cache:'no-store'});
-  const body=await res.json(); if(!res.ok) throw Error(body.error||'Account service unavailable'); return body;
+  const body=await res.json(); if(!res.ok) throw Object.assign(Error(body.error||'Account service unavailable'),{status:res.status}); return body;
 };
 const status=message=>{$('accountStatus').textContent=message;};
 async function logout(){try{await api('logout','POST');location.replace(location.pathname);}catch(e){status(e.message);}}

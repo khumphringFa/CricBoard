@@ -163,3 +163,10 @@ Google reference documentation:
 
 Automated checks cover score round-trips, invalid backup rejection, paginated history, concurrent cloud writes, conflict resolution, content integrity, API failures, account connection, offline queue, cloud pull, restore recovery and disconnect. Before a tournament, also test a real Google connection on two devices: backup on A, restore on B, change a score offline, reconnect and sync, then make independent edits on both devices and verify a conflict is shown. Test denied permissions, token expiry and popup blocking. Real Google OAuth and Drive transfers require the configured client ID and interactive account consent.
 
+## Central organizer data and Super Admin
+
+Central sharing is optional and independent of private Google Drive and account backups. Approved organizers can enable sharing in the management dashboard. This stores the latest tournament records in the CricBoard D1 database and synchronizes changes while the organizer app is open. A stale device cannot overwrite a newer revision silently: restore the central copy or explicitly replace it after reviewing the conflict. Organizers can revoke central sharing at any time; their private backups and existing spectator links are unaffected.
+
+Super Admin can review approved organizers, sharing status, last synchronization, shared tournament and match counts, batting and bowling leaders, and download organizer CSV or JSON recovery copies. Unshared records are not available to Super Admin. This is a latest-copy recovery feature, not a version history. No private Drive access is granted by central sharing.
+
+The existing D1 binding is reused; the new table is created on authenticated access. After deployment, test opt-in, scoring changes, administrator review, restoration and revocation with two separate approved accounts.

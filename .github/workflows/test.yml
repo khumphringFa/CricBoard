@@ -1,0 +1,14 @@
+name: Test CricBoard
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check app.js && node --check cloud.mjs && node --check account.mjs && node --check worker.mjs && node --check portal.mjs && node --check public-data.mjs && node --check central.mjs && node --check central-data.mjs
+      - run: node --test engine.test.mjs cloud.test.mjs worker.test.mjs
