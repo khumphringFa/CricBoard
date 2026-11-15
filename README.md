@@ -2,13 +2,21 @@
 
 **Local cricket tournament management, ball-by-ball scoring, and a temporary live spectator display.**
 
-CricBoard is a lightweight, mobile-first web app for village tournaments, school competitions, and short-format community cricket matches. No database, app store installation, or account is required for this first version.
+CricBoard is a lightweight, mobile-first web app for village tournaments, school competitions, and short-format community cricket matches. No app installation is required. Google sign-in and administrator approval are required to score; spectators can use temporary read-only links without registering.
 
 ## Open CricBoard — live app
 
 **[Launch CricBoard / Google account backup sign-in](https://cricboard.manas-tripura.workers.dev/)**
 
-The primary hosted app runs on Cloudflare Workers. Use this URL on your computer or phone. To connect your Google account, open the app and use the Google Drive backup controls. No sign-in is required for local scoring.
+The primary hosted app runs on Cloudflare Workers. Use this URL on your computer or phone. To connect your Google account, open the app and use the Google Drive backup controls. Approved Google sign-in is required for scoring.
+
+## Account registration and administrator approval
+
+- Sign in with Google. The configured initial administrator is automatically approved; all other new users remain pending until approved by an administrator.
+- Open User approval to approve or suspend organizers. Organizers manage independent tournament collections. Public temporary spectator links remain read-only and do not require sign-in.
+- On the administrator's first sign-in, the app offers to copy existing browser records into the administrator's account; the original browser copy is retained. Google Drive backup and restore must use the same Google account as CricBoard sign-in.
+- Account records can also be saved or restored explicitly in Cloudflare D1. A revision check prevents a stale device from silently overwriting a newer account copy. Save to the account or Google Drive before switching devices. Do not use a shared untrusted browser profile for sensitive local records.
+- Cloudflare D1 binding `DB` is defined in `wrangler.jsonc`; tables are initialized on the first successful Google login, or manually with `schema.sql`. The Google OAuth Web client must allow the production origin; if the consent screen remains in testing, users may need to be added as test users in Google Cloud. For local authenticated development use Wrangler, not a plain static HTTP server. This application now needs a Worker API; GitHub Pages alone cannot host authenticated scoring.
 
 ## What works
 
@@ -27,7 +35,7 @@ The primary hosted app runs on Cloudflare Workers. Use this URL on your computer
 
 ## Using the app
 
-1. Open [CricBoard on Cloudflare](https://cricboard.manas-tripura.workers.dev/) (or run a local HTTP server with: python3 -m http.server 8000, then visit http://localhost:8000).
+1. Open [CricBoard on Cloudflare](https://cricboard.manas-tripura.workers.dev/) and sign in with Google.
 2. Add a tournament, at least two teams, and Create fixture. Select Start match.
 3. As each ball is delivered, tap the runs, wicket, or the relevant extra. Press Undo if a mistake was made.
 4. Tap Start second innings after the innings break. The match completes automatically after a successful chase, all 10 wickets, or the legal balls limit.

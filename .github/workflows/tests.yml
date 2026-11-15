@@ -10,5 +10,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check app.js && node --check cloud.mjs
-      - run: node --test engine.test.mjs cloud.test.mjs
+      - run: node --check app.js && node --check cloud.mjs && node --check account.mjs && node --check worker.mjs
+      - run: node --test engine.test.mjs cloud.test.mjs worker.test.mjs
