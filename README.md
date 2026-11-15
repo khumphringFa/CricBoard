@@ -12,6 +12,8 @@ The primary hosted app runs on Cloudflare Workers. Use this URL on your computer
 
 ## Account registration and administrator approval
 
+Production deployment uses the Git-connected Cloudflare Worker (`main` branch), with `npx wrangler deploy` and the D1 binding from `wrangler.jsonc`. Do not use the static-file uploader for this version.
+
 - Sign in with Google. The configured initial administrator is automatically approved; all other new users remain pending until approved by an administrator.
 - Open User approval to approve or suspend organizers. Organizers manage independent tournament collections. Public temporary spectator links remain read-only and do not require sign-in.
 - On the administrator's first sign-in, the app offers to copy existing browser records into the administrator's account; the original browser copy is retained. Google Drive backup and restore must use the same Google account as CricBoard sign-in.
