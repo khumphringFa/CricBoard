@@ -1,8 +1,7 @@
-name: Deploy CricBoard
+name: Deploy CricBoard (optional GitHub Pages)
 
 on:
-  push:
-    branches: [main]
+  # Cloudflare is the primary host; deploy Pages only after enabling it.
   workflow_dispatch:
 
 permissions:
