@@ -33,6 +33,8 @@ jobs:
       - run: gradle -p android :app:assembleDebug :app:lintDebug
   signed:
     needs: debug
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-24.04
     steps:
@@ -41,6 +43,15 @@ jobs:
           fetch-depth: 0
       - name: Verify trusted release source
         run: git merge-base --is-ancestor HEAD origin/main
+      - name: Resolve app version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(awk -F "'" '/^[[:space:]]*versionName / {print $2}' android/app/build.gradle)
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF" != "refs/tags/v$version" ]]; then exit 1; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -61,6 +72,7 @@ jobs:
           test -f "$ANDROID_HOME/platforms/android-35/android.jar"
       - name: Build signed APK and AAB
         env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -77,19 +89,19 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
           gradle -p android :app:assembleRelease :app:bundleRelease
           mkdir -p release
-          cp android/app/build/outputs/apk/release/app-release.apk release/CricBoard-v1.1.0.apk
-          cp android/app/build/outputs/bundle/release/app-release.aab release/CricBoard-v1.1.0.aab
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs release/CricBoard-v1.1.0.apk
-          jarsigner -verify release/CricBoard-v1.1.0.aab
+          cp android/app/build/outputs/apk/release/app-release.apk "release/CricBoard-v$APP_VERSION.apk"
+          cp android/app/build/outputs/bundle/release/app-release.aab "release/CricBoard-v$APP_VERSION.aab"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "release/CricBoard-v$APP_VERSION.apk"
+          jarsigner -verify "release/CricBoard-v$APP_VERSION.aab"
           (cd release && sha256sum *.apk *.aab > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
-          name: CricBoard-v1.1.0-signed
+          name: CricBoard-v${{ steps.version.outputs.version }}-signed
           path: release/
           if-no-files-found: error
   publish-release:
     needs: signed
-    if: github.ref == 'refs/tags/v1.1.0' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -97,20 +109,18 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: CricBoard-v1.1.0-signed
+          name: CricBoard-v${{ needs.signed.outputs.version }}-signed
           path: release
-      - name: Publish signed APKs
+      - name: Publish verified APK
         env:
           GH_TOKEN: ${{ github.token }}
+          APP_VERSION: ${{ needs.signed.outputs.version }}
         run: |
           set -euo pipefail
           (cd release && sha256sum -c SHA256SUMS.txt)
-          if ! gh release view v1.0.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            mkdir -p legacy
-            gh run download 43729676898 --repo "$GITHUB_REPOSITORY" --name CricBoard-v1.0.0-signed --dir legacy
-            (cd legacy && sha256sum -c SHA256SUMS.txt)
-            gh release create v1.0.0 legacy/* --repo "$GITHUB_REPOSITORY" --target ab742574d542e6aaed84a91c79632b190dc3ac01 --title "CricBoard v1.0.0" --notes "Original signed Android APK." --latest=false
-          fi
-          if ! gh release view v1.1.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create v1.1.0 release/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "CricBoard v1.1.0" --notes "Signed Android APK with bundled scoring, offline data and automatic sync. Device testing recommended." --prerelease
+          tag="v$APP_VERSION"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Version already published; keeping existing release intact."
+          else
+            gh release create "$tag" release/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "CricBoard $tag" --notes "Signed Android APK. Device testing recommended before promoting to stable." --prerelease
           fi
