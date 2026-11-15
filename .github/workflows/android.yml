@@ -1,7 +1,7 @@
 name: CricBoard Android
 on:
   pull_request:
-    paths: ['android/**', '.github/workflows/android.yml']
+    paths: ['android/**', '.github/workflows/android.yml', '*.mjs', '*.js', '*.html', '*.css']
   workflow_dispatch:
   push:
     tags: ['v*']
@@ -23,6 +23,8 @@ jobs:
         uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools platforms;android-35 build-tools;34.0.0 build-tools;35.0.0'
+      - name: Bundle scoring dependencies
+        run: npm install --prefix android --no-save --ignore-scripts peerjs@1.5.5
       - name: Verify Android SDK
         run: |
           sdkmanager --version
@@ -50,6 +52,8 @@ jobs:
         uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools platforms;android-35 build-tools;34.0.0 build-tools;35.0.0'
+      - name: Bundle scoring dependencies
+        run: npm install --prefix android --no-save --ignore-scripts peerjs@1.5.5
       - name: Verify Android SDK
         run: |
           sdkmanager --version
@@ -73,28 +77,28 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
           gradle -p android :app:assembleRelease :app:bundleRelease
           mkdir -p release
-          cp android/app/build/outputs/apk/release/app-release.apk release/CricBoard-v1.0.0.apk
-          cp android/app/build/outputs/bundle/release/app-release.aab release/CricBoard-v1.0.0.aab
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs release/CricBoard-v1.0.0.apk
-          jarsigner -verify release/CricBoard-v1.0.0.aab
+          cp android/app/build/outputs/apk/release/app-release.apk release/CricBoard-v1.1.0.apk
+          cp android/app/build/outputs/bundle/release/app-release.aab release/CricBoard-v1.1.0.aab
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs release/CricBoard-v1.1.0.apk
+          jarsigner -verify release/CricBoard-v1.1.0.aab
           (cd release && sha256sum *.apk *.aab > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
-          name: CricBoard-v1.0.0-signed
+          name: CricBoard-v1.1.0-signed
           path: release/
           if-no-files-found: error
   draft-release:
     needs: signed
-    if: github.ref == 'refs/tags/v1.0.0'
+    if: github.ref == 'refs/tags/v1.1.0'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: CricBoard-v1.0.0-signed
+          name: CricBoard-v1.1.0-signed
           path: release
       - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create v1.0.0 release/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "CricBoard v1.0.0" --notes "Android browser-backed companion. Test sign-in, tournament scoring and central sync on a device before publishing."
+        run: gh release create v1.1.0 release/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "CricBoard v1.1.0" --notes "Android bundled scoring app. Test sign-in, tournament scoring and central sync on a device before publishing."

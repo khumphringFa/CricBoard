@@ -167,6 +167,7 @@ export function initCloud({ getStore, replaceStore, storage = localStorage, expe
   const autoKey = 'cricboard-google-auto';
   let drive = null, account = null, expires = 0, files = [], busy = false, timer, epoch = 0;
   let pending = false;
+  const native=window.CricNative;let renewing=false;
   const read = key => { try { return storage.getItem(key); } catch { return null; } };
   const write = (key, value) => storage.setItem(key, value);
   const message = value => { $('cloudStatus').textContent = value; };
@@ -256,7 +257,7 @@ export function initCloud({ getStore, replaceStore, storage = localStorage, expe
   function changed() {
     clearTimeout(timer);
     if (!auto()) return;
-    if (!active()) return message('Scores saved on this device. Connect Google to resume automatic sync.');
+    if (!active()) {if(native&&navigator.onLine)connectNative(false);return message('Scores saved on this device. Google authorization is needed to resume backup.');}
     if (!navigator.onLine) return message('Offline: scores saved on this device. Automatic sync will retry when connected.');
     message('Local changes saved. Google sync pending…');
     timer = setTimeout(() => run(() => synchronize()), 15000);
@@ -282,10 +283,24 @@ export function initCloud({ getStore, replaceStore, storage = localStorage, expe
     catch { message('Browser settings could not be saved. Allow local storage and try again.'); }
   };
   // Loaded only on the scoring page; spectator pages never initialize Google.
-  const script = document.createElement('script'); script.src = 'https://accounts.google.com/gsi/client'; script.async = true;
+  if(!native){const script = document.createElement('script'); script.src = 'https://accounts.google.com/gsi/client'; script.async = true;
   script.onerror = () => message('Google sign-in could not load. Check internet access; local scoring still works.');
-  document.head.append(script);
+  document.head.append(script);}
+  async function connectNative(interactive){
+    if(!native||renewing||busy)return;
+    renewing=true;const session=++epoch;
+    try{const token=await native.drive(interactive,window.cricboardAccount.email);if(!token||session!==epoch)return;
+      await run(async()=>{const candidate=new DriveSnapshots(token);const profile=await candidate.api('https://www.googleapis.com/oauth2/v3/userinfo');
+        if(profile.sub!==expectedSub)throw Error('Authorize the same Google account used for CricBoard.');
+        if(session!==epoch)return;drive=candidate;account=profile;expires=Date.now()+45*60000;
+        $('cloudAccount').textContent=profile.email;
+        if(interactive){$('cloudAuto').checked=true;write(autoKey,'1');}
+        await refresh();if(auto())await synchronize();
+      });
+    }catch(e){message(e.message+' Local scores remain safe.');}finally{renewing=false;controls();}
+  }
   $('cloudConnect').onclick = () => {
+    if(native){connectNative(true);return;}
     if (!clientId()) { $('cloudSetup').open = true; return message('One-time setup required: enter your Google OAuth Web client ID below.'); }
     if (!window.google?.accounts?.oauth2) return message('Google sign-in is still loading or blocked. Check your connection and try again.');
     const session = ++epoch;
@@ -316,7 +331,7 @@ export function initCloud({ getStore, replaceStore, storage = localStorage, expe
     try { client.requestAccessToken({ prompt: 'select_account' }); }
     catch { busy = false; controls(); message('Google sign-in could not start. Try again.'); }
   };
-  $('cloudDisconnect').onclick = disconnect;
+  $('cloudDisconnect').onclick = ()=>{if(native){$('cloudAuto').checked=false;write(autoKey,'0');}disconnect();};
   $('cloudBackup').onclick = () => run(() => synchronize(true));
   $('cloudSync').onclick = () => run(() => synchronize());
   $('cloudRefresh').onclick = () => run(async () => { await refresh(); message(files.length + ' backup version(s) available.'); });
@@ -345,7 +360,8 @@ export function initCloud({ getStore, replaceStore, storage = localStorage, expe
   window.addEventListener('online', changed);
   window.addEventListener('offline', () => { if (auto()) message('Offline: keep scoring. Changes are saved on this device.'); });
   // Poll while connected; token renewal is always a user-initiated Google popup.
-  setInterval(() => { controls(); if (auto() && active() && navigator.onLine && !busy) run(() => synchronize()); }, 60000);
+  setInterval(() => { controls(); if (auto() && navigator.onLine && !busy) {if(active())run(() => synchronize());else if(native)connectNative(false);} }, 60000);
+  if(native&&auto()&&navigator.onLine)connectNative(false);
   controls();
   message(clientId() ? 'Local scores are saved. Connect Google for private backup and restore.' : 'Google backup needs one-time setup. Download a backup file anytime.');
   return { changed };
