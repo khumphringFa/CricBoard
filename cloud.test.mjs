@@ -125,6 +125,16 @@ test('expired, denied and rate limited requests produce actionable errors', asyn
   }
 });
 
+test('default browser fetch is not invoked with the Drive client as its receiver', async t => {
+  const original = globalThis.fetch;
+  t.after(() => { globalThis.fetch = original; });
+  globalThis.fetch = function () {
+    assert.ok(this === undefined || this === globalThis, 'native fetch cannot receive the Drive client as this');
+    return Promise.resolve(new Response(JSON.stringify({ files: [] })));
+  };
+  assert.deepEqual(await new DriveSnapshots('token').list(), []);
+});
+
 test('UI integration: connect, backup, offline queue, cloud restore and safe failed recovery', async t => {
   const ids = ['cloudStatus', 'cloudBackup', 'cloudSync', 'cloudRefresh', 'cloudRestore', 'cloudConnect', 'cloudDisconnect', 'cloudVersions', 'cloudImport', 'cloudRecovery', 'cloudAuto', 'cloudAccount', 'googleClientId', 'cloudSaveClient', 'cloudSetup', 'cloudExport'];
   const elements = Object.fromEntries(ids.map(id => [id, { value: '', textContent: '', disabled: false, checked: false, options: [], add(option) { this.options.push(option); if (!this.value) this.value = option.value; }, replaceChildren() { this.options = []; this.value = ''; } }]));
@@ -177,3 +187,4 @@ test('UI integration: connect, backup, offline queue, cloud restore and safe fai
   assert.equal(elements.cloudBackup.disabled, true);
   assert.equal(remote.files.size, 3, 'restore/disconnect do not delete backup versions');
 });
+
