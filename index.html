@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1830">
+  <!-- Public Google OAuth Web client ID only. NEVER put a client secret here. -->
+  <meta name="google-client-id" content="">
   <meta name="description" content="CricBoard: local cricket tournament manager, ball-by-ball scoring and temporary live spectator scoreboard.">
   <title>CricBoard · Local Cricket Scoring</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -68,6 +70,30 @@
             </section>
           </div>
           <div class="secondary-column">
+            <section class="panel cloud-panel" aria-labelledby="cloudTitle">
+              <div class="panel-title"><div><span class="overline">YOUR DATA, ANY DEVICE</span><h2 id="cloudTitle">Backup &amp; Google sync</h2></div><span class="decor-icon" aria-hidden="true">☁</span></div>
+              <p class="cloud-description">Keep tournaments, teams, match scores and results in your private Google Drive app storage. Previous cloud versions are kept.</p>
+              <p id="cloudAccount" class="cloud-account">Not connected</p>
+              <div class="cloud-buttons"><button id="cloudConnect" type="button" class="btn btn-outline">Connect Google</button><button id="cloudDisconnect" type="button" class="btn btn-light" disabled>Disconnect</button></div>
+              <p id="cloudStatus" class="cloud-status" role="status" aria-live="polite">Scores are saved on this device.</p>
+              <div class="cloud-buttons"><button id="cloudSync" type="button" class="btn btn-primary" disabled>Sync now</button><button id="cloudBackup" type="button" class="btn btn-outline" disabled>Backup this device</button></div>
+              <label class="cloud-auto"><input id="cloudAuto" type="checkbox"> Automatic sync while this page is open</label>
+              <p class="hint">Changes sync after 15 seconds without edits, or on the next one-minute check. Internet and an active Google session are needed. Use one scoring device at a time.</p>
+              <label for="cloudVersions" class="label">Cloud backup history</label>
+              <select id="cloudVersions" class="field" disabled aria-label="Cloud backup history"></select>
+              <div class="cloud-buttons"><button id="cloudRestore" type="button" class="btn btn-light" disabled>Restore selected backup</button><button id="cloudRefresh" type="button" class="btn btn-text" disabled>Refresh history</button></div>
+              <details class="cloud-details"><summary>File backup &amp; recovery</summary>
+                <div class="cloud-buttons"><button id="cloudExport" type="button" class="btn btn-light">Download backup</button><button id="cloudRecovery" type="button" class="btn btn-light" disabled>Download recovery copy</button></div>
+                <label class="label" for="cloudImport">Restore a CricBoard JSON file</label><input id="cloudImport" type="file" accept=".json,application/json" class="field">
+                <p class="hint">A recovery copy of device scores is saved before each restore. Backups contain your cricket records; keep downloaded files somewhere safe.</p>
+              </details>
+              <details id="cloudSetup" class="cloud-details"><summary>Google connection setup</summary>
+                <p class="hint">One-time setup: enable Google Drive API, create an OAuth Web client and add this site's origin under Authorized JavaScript origins. Use the same client ID on every device. No client secret is needed.</p>
+                <label class="label" for="googleClientId">Google OAuth Web client ID</label><input id="googleClientId" class="field" placeholder="123456…apps.googleusercontent.com" autocomplete="off" spellcheck="false">
+                <button id="cloudSaveClient" class="btn btn-light" type="button">Save connection setup</button>
+              </details>
+              <p class="hint">Backups are private to this app and account, hidden from the Drive file list. Google tokens stay in memory and are cleared when this page closes. Disconnect keeps your backups.</p>
+            </section>
             <section class="panel">
               <div class="panel-title"><div><span class="overline">NEW FIXTURE</span><h2>Create a match</h2></div><span class="decor-icon">＋</span></div>
               <form id="matchForm" class="stacked-form">

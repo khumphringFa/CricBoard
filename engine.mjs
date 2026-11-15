@@ -140,3 +140,4 @@ export function standings(matches, teamIds) {
   }
   return [...rows.values()].sort((a, b) => b.points - a.points || b.won - a.won || a.id.localeCompare(b.id));
 }
+

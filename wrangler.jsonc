@@ -1,0 +1,9 @@
+{
+  "name": "cricboard",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "assets": { "directory": "./dist" },
+  "build": {
+    "command": "mkdir -p dist && cp index.html styles.css app.js engine.mjs cloud.mjs favicon.svg dist/"
+  }
+}

@@ -27,13 +27,16 @@ jobs:
         with:
           node-version: '22'
       - name: Run scoring tests
-        run: node --test engine.test.mjs
+        run: node --test engine.test.mjs cloud.test.mjs
+      - name: Prepare static site
+        run: mkdir -p dist && cp index.html styles.css app.js engine.mjs cloud.mjs favicon.svg dist/
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: dist
       - name: Deploy site
         id: deployment
         uses: actions/deploy-pages@v4
+

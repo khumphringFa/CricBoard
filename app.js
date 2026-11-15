@@ -1,4 +1,5 @@
 import { makeId, createMatch, startMatch, applyDelivery, undoDelivery, advanceInnings, endInnings, summary, standings, oversText, lastOverDeliveries } from "./engine.mjs";
+import { initCloud, validateStore } from "./cloud.mjs";
 
 const KEY = "cricboard-tournaments-v1";
 const $ = id => document.getElementById(id);
@@ -11,6 +12,7 @@ function read() {
   } catch { return empty(); }
 }
 let store = read();
+let cloud = null;
 let peer = null;
 let liveMatchId = null;
 let liveConnections = new Set();
@@ -26,7 +28,7 @@ const localId = query.get("local");
 const spectator = Boolean(remoteId || localId);
 
 function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(store)); }
+  try { localStorage.setItem(KEY, JSON.stringify(store)); cloud?.changed(); }
   catch { notify("Browser storage is unavailable. Scores may not be saved."); }
 }
 function notify(message) {
@@ -355,4 +357,21 @@ function bindUI() {
   window.addEventListener("beforeunload", () => { if (peer) peer.destroy(); });
 }
 if (spectator) initDisplay();
-else { bindUI(); render(); }
+else {
+  bindUI(); render();
+  cloud = initCloud({
+    getStore: () => store,
+    replaceStore: input => {
+      const restored = validateStore(input);
+      // Persist successfully before changing the score screen or stopping a broadcast.
+      localStorage.setItem(KEY, JSON.stringify(restored));
+      stopLive(); store = restored; render();
+    }
+  });
+  window.addEventListener('storage', event => {
+    if (event.key !== KEY) return;
+    // Keep another scorer tab from overwriting this tab's newer scores.
+    store = read(); render(); broadcast(); cloud.changed();
+  });
+}
+

@@ -47,3 +47,4 @@ test("tie and standings", () => {
   assert.equal(table[0].points,1);
   assert.equal(table[1].points,1);
 });
+
