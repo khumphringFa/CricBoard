@@ -1,4 +1,5 @@
 import { validateStore } from './cloud.mjs';
+import { publicTournament } from './public-data.mjs';
 
 const CLIENT = '342863663518-8raaefvf2qt3skk5jfbego0vfob8441f.apps.googleusercontent.com';
 // Bootstrap identity fingerprint, not a credential; verified Google email is required.
@@ -32,6 +33,7 @@ export async function registerVerifiedIdentity(db, identity, adminHash=ADMIN_HAS
 }
 const cookie = (token, age) => `__Host-cricboard=${token}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${age}`;
 const sessionToken = req => /(?:^|;\s*)__Host-cricboard=([a-f0-9]{64})(?:;|$)/.exec(req.headers.get('Cookie')||'')?.[1];
+const publicSchema = 'CREATE TABLE IF NOT EXISTS published_tournaments (slug TEXT PRIMARY KEY, sub TEXT NOT NULL REFERENCES accounts(sub), tournament_id TEXT NOT NULL, name TEXT NOT NULL, data TEXT NOT NULL, visible INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL, UNIQUE(sub,tournament_id))';
 
 export async function verifyGoogle(token, fetcher=fetch, now=Date.now()) {
   if(typeof token!=='string'||token.length>10000) throw Error('Invalid Google credential');
@@ -54,6 +56,20 @@ export async function handle(request,env) {
   if(!db) return json({error:'Account service is not configured'},503);
   if(request.method!=='GET' && request.headers.get('Origin')!==url.origin) return json({error:'Invalid origin'},403);
   try {
+    if(path==='/api/public'&&request.method==='GET') {
+      const q=await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='published_tournaments'").first();
+      if(!q) return json([]);
+      const offset=Math.min(10000,Math.max(0,Number.parseInt(url.searchParams.get('offset')||'0',10)||0));
+      const rows=(await db.prepare("SELECT p.slug,p.name,p.updated_at,p.data FROM published_tournaments p JOIN accounts a ON a.sub=p.sub WHERE p.visible=1 AND a.status='approved' ORDER BY p.updated_at DESC LIMIT 24 OFFSET ?").bind(offset).all()).results;
+      return json(rows.map(r=>{const d=JSON.parse(r.data);return {slug:r.slug,name:r.name,updatedAt:r.updated_at,teams:d.teams.length,live:d.matches.filter(m=>m.status==='live'||m.status==='break').length,scheduled:d.matches.filter(m=>m.status==='scheduled').length,completed:d.matches.filter(m=>m.status==='completed').length};}));
+    }
+    if(path.startsWith('/api/public/')&&request.method==='GET') {
+      const slug=path.split('/').at(-1);if(!/^[a-f0-9-]{36}$/.test(slug))return json({error:'Tournament not found'},404);
+      const q=await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='published_tournaments'").first();
+      if(!q)return json({error:'Tournament not found'},404);
+      const row=await db.prepare("SELECT p.slug,p.updated_at,p.data FROM published_tournaments p JOIN accounts a ON a.sub=p.sub WHERE p.slug=? AND p.visible=1 AND a.status='approved'").bind(slug).first();
+      return row?json({slug:row.slug,updatedAt:row.updated_at,...JSON.parse(row.data)}):json({error:'Tournament not found'},404);
+    }
     if(path==='/api/login'&&request.method==='POST') {
       let identity; try {identity=await verifyGoogle((await request.json()).credential);} catch {return json({error:'Google identity could not be verified'},401);}
       const account=await registerVerifiedIdentity(db,identity,env.ADMIN_EMAIL_HASH||ADMIN_HASH);
@@ -70,6 +86,24 @@ export async function handle(request,env) {
     if(!account) return json({error:'Sign in required'},401);
     if(path==='/api/me'&&request.method==='GET') return json(account);
     if(account.status!=='approved') return json({error:'Administrator approval required'},403);
+    if(path==='/api/publications') {
+      await db.prepare(publicSchema).run();
+      if(request.method==='GET')return json((await db.prepare('SELECT slug,tournament_id,visible,updated_at FROM published_tournaments WHERE sub=?').bind(account.sub).all()).results);
+      if(request.method==='POST'||request.method==='PUT'){
+        const raw=await request.text();if(new TextEncoder().encode(raw).length>900000)return json({error:'Tournament too large to publish'},413);
+        let payload,view;try{payload=JSON.parse(raw);view=publicTournament(payload.data,payload.includePlayers===true);}catch{return json({error:'Invalid tournament data'},400);}
+        const tournamentId=payload.data.tournaments[0].id, serialized=JSON.stringify(view);if(new TextEncoder().encode(serialized).length>900000)return json({error:'Public scorecards too large'},413);
+        if(request.method==='PUT'){
+          const result=await db.prepare('UPDATE published_tournaments SET name=?,data=?,updated_at=? WHERE sub=? AND tournament_id=? AND visible=1 AND updated_at=?').bind(view.name,serialized,Math.max(Date.now(),Number(payload.updatedAt)+1),account.sub,tournamentId,payload.updatedAt).run();
+          if(!result.meta.changes)return json({error:'Publication changed or was unpublished. Publish again explicitly.'},409);
+        }else await db.prepare('INSERT INTO published_tournaments(slug,sub,tournament_id,name,data,visible,updated_at) VALUES(?,?,?,?,?,1,?) ON CONFLICT(sub,tournament_id) DO UPDATE SET name=excluded.name,data=excluded.data,visible=1,updated_at=excluded.updated_at').bind(crypto.randomUUID(),account.sub,tournamentId,view.name,serialized,Date.now()).run();
+        return json(await db.prepare('SELECT slug,visible,updated_at FROM published_tournaments WHERE sub=? AND tournament_id=?').bind(account.sub,tournamentId).first());
+      }
+      if(request.method==='DELETE'){
+        const {tournamentId}=await request.json();if(typeof tournamentId!=='string')return json({error:'Invalid tournament'},400);
+        await db.prepare('UPDATE published_tournaments SET visible=0 WHERE sub=? AND tournament_id=?').bind(account.sub,tournamentId).run();return json({ok:true});
+      }
+    }
     if(path==='/api/accounts'&&request.method==='GET'&&account.role==='admin') return json((await db.prepare('SELECT sub,email,role,status FROM accounts ORDER BY created_at').all()).results);
     if(path==='/api/accounts'&&request.method==='POST'&&account.role==='admin') {
       const {sub,status}=await request.json();

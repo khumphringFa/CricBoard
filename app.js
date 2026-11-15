@@ -14,6 +14,7 @@ function read() {
 let store = read();
 store.players ||= [];
 let cloud = null;
+let publicationChanged=()=>{}, publicationRender=()=>{};
 let peer = null;
 let liveMatchId = null;
 let liveConnections = new Set();
@@ -29,7 +30,7 @@ const localId = query.get("local");
 const spectator = Boolean(remoteId || localId);
 
 function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(store)); cloud?.changed(); }
+  try { localStorage.setItem(KEY, JSON.stringify(store)); cloud?.changed(); publicationChanged(); }
   catch { notify("Browser storage is unavailable. Scores may not be saved."); }
 }
 function notify(message) {
@@ -81,7 +82,7 @@ function render() {
   renderScore();
   renderPoints(ts, ms);
   renderShare();
-  renderRoster(); renderTournamentStats();
+  renderRoster(); renderTournamentStats(); publicationRender();
 }
 function updateBattingFirst(preferred) {
   const list = [$("teamA").value, $("teamB").value].filter(Boolean).map(id => ({id,name:nameOf(id)}));
@@ -455,11 +456,39 @@ function bindUI() {
   });
   window.addEventListener("beforeunload", () => { if (peer) peer.destroy(); });
 }
+function setupPublications(account){
+  const records=new Map(), autoSettings=new Map();let currentId=null,timer,busy=false;
+  const active=()=>tournament()?.id;
+  const status=message=>{$('publicationStatus').textContent=message;};
+  const update=()=>{
+    const id=active(),record=records.get(id);
+    if(currentId!==id){clearTimeout(timer);currentId=id;$('publishPlayers').checked=false;$('publishAuto').checked=false;status(record?.visible?'Published. Click update to refresh the public copy.':'Private until published.');}
+    $('publishAuto').disabled=!record?.visible||!autoSettings.has(id);
+    $('unpublishTournament').disabled=!record?.visible||busy;
+    $('publishTournament').disabled=busy;
+    const link=$('publicationLink');link.hidden=!record?.visible;if(record?.visible)link.href='?tournament='+encodeURIComponent(record.slug);
+  };
+  const selected=id=>({tournaments:store.tournaments.filter(t=>t.id===id),teams:store.teams.filter(t=>t.tournamentId===id),matches:store.matches.filter(m=>m.tournamentId===id),players:(store.players||[]).filter(p=>p.tournamentId===id),activeTournamentId:id,activeMatchId:null});
+  const publish=async(id,includePlayers,automatic=false)=>{
+    if(busy)return;busy=true;update();
+    try{const record=await account.api('publications',automatic?'PUT':'POST',{data:selected(id),includePlayers,updatedAt:records.get(id)?.updated_at});records.set(id,record);if(!automatic)autoSettings.set(id,includePlayers);if(active()===id)status('Published · '+new Date(record.updated_at).toLocaleTimeString());}
+    catch(e){if(active()===id){status(e.message);$('publishAuto').checked=false;} autoSettings.delete(id);}
+    finally{busy=false;update();}
+  };
+  $('publishTournament').onclick=()=>{const id=active(),players=$('publishPlayers').checked;if(!confirm('Publish '+tournament().name+' on the public internet? '+(players?'Player names and individual statistics will also be visible.':'Only team and match statistics will be visible.')))return;clearTimeout(timer);$('publishAuto').checked=false;publish(id,players);};
+  $('unpublishTournament').onclick=async()=>{const id=active();if(!confirm('Remove this tournament from the public portal? Your private records will remain.'))return;clearTimeout(timer);$('publishAuto').checked=false;autoSettings.delete(id);busy=true;update();try{await account.api('publications','DELETE',{tournamentId:id});records.delete(id);status('Unpublished.');}catch(e){status(e.message);}finally{busy=false;update();}};
+  $('publishAuto').onchange=()=>{if(!$('publishAuto').checked)clearTimeout(timer);};
+  publicationRender=update;
+  publicationChanged=()=>{const id=active();if(id!==currentId||!$('publishAuto').checked||!autoSettings.has(id))return;clearTimeout(timer);timer=setTimeout(()=>{if(active()===id&&$('publishAuto').checked){if(busy){publicationChanged();return;}publish(id,autoSettings.get(id),true);}},1500);};
+  account.api('publications').then(list=>{for(const p of list)records.set(p.tournament_id,p);currentId=null;update();}).catch(e=>status(e.message));
+  update();
+}
 if (spectator) initDisplay();
 else {
   if (!window.cricboardAccount || window.cricboardAccount.status !== 'approved') throw Error('Approved sign-in required');
   bindUI(); render();
   const account=window.cricboardAccount;
+  setupPublications(account);
   const scopedStorage={getItem:k=>localStorage.getItem(KEY+':'+k),setItem:(k,v)=>localStorage.setItem(KEY+':'+k,v),removeItem:k=>localStorage.removeItem(KEY+':'+k)};
   cloud = initCloud({
     storage:scopedStorage, expectedSub:account.sub,

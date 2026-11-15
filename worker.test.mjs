@@ -3,6 +3,17 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import {handle,verifyGoogle,canonicalEmail,registerVerifiedIdentity} from './worker.mjs';
+import {publicTournament} from './public-data.mjs';
+import {createMatch,startMatch,selectPlayers,applyDelivery} from './engine.mjs';
+
+test('public scorecards are opt-in and derive scores without exposing raw deliveries',()=>{
+  const squads={A:[{id:'A1',name:'Batter one'},{id:'A2',name:'Batter two'}],B:[{id:'B1',name:'Bowler one'},{id:'B2',name:'Bowler two'}]};
+  let m=startMatch(createMatch({tournamentId:'t',teamA:'A',teamB:'B',battingFirst:'A',overs:2,squads}));
+  m=selectPlayers(m,{striker:'A1',nonStriker:'A2',bowler:'B1'});m=applyDelivery(m,{kind:'bat',runs:4});
+  const data={tournaments:[{id:'t',name:'Cup'}],teams:[{id:'A',name:'Alpha',tournamentId:'t'},{id:'B',name:'Beta',tournamentId:'t'}],matches:[m],activeTournamentId:'t',activeMatchId:m.id};
+  const teamOnly=publicTournament(data);assert.equal(teamOnly.matches[0].innings[0].runs,4);assert.doesNotMatch(JSON.stringify(teamOnly),/Batter one|Bowler one|deliveries/);
+  const detail=publicTournament(data,true);assert.equal(detail.batting[0].runs,4);assert.equal(detail.bowling[0].runs,4);assert.equal(detail.matches[0].innings[0].batting[0].name,'Batter one');assert.doesNotMatch(JSON.stringify(detail),/deliveries|lineup|A1/);
+});
 
 test('verified Gmail aliases promote only the configured administrator and retain data',async()=>{
   const sql=new DatabaseSync(':memory:'); sql.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));
@@ -61,4 +72,28 @@ test('real SQL isolates account snapshots and rejects stale revisions',async()=>
   assert.equal((await request(0,'snapshot','PUT',{revision:null,data})).status,409);
   assert.equal((await request(1,'accounts')).status,404);
   assert.deepEqual((await (await request(0,'snapshot')).json()).data,data);
+});
+test('public portal requires explicit publication, isolates owners, hides suspended users and blocks stale updates',async()=>{
+  const sql=new DatabaseSync(':memory:');sql.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));
+  const DB={prepare:statement=>{const bound=(...args)=>({first:async()=>sql.prepare(statement).get(...args),run:async()=>({meta:sql.prepare(statement).run(...args)}),all:async()=>({results:sql.prepare(statement).all(...args)})});return {...bound(),bind:bound};}};
+  const tokens=['a'.repeat(64),'b'.repeat(64)];
+  for(const [i,token] of tokens.entries()){
+    const sub='owner'+i;sql.prepare('INSERT INTO accounts VALUES(?,?,?,?,?)').run(sub,sub+'@gmail.com','organizer','approved',Date.now());
+    const digest=Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token))).toString('hex');sql.prepare('INSERT INTO sessions VALUES(?,?,?)').run(digest,sub,Date.now()+60000);
+  }
+  const req=(i,path,method='GET',body)=>handle(new Request('https://example.com/api/'+path,{method,headers:{...(i===null?{}:{Cookie:'__Host-cricboard='+tokens[i]}),Origin:'https://example.com','Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)}),{DB});
+  const data={tournaments:[{id:'t',name:'Public league',privateNote:'never expose'}],teams:[{id:'a',name:'Alpha',tournamentId:'t',contact:'private phone'}],players:[{id:'p',name:'Private Player',teamId:'a',tournamentId:'t'}],matches:[],activeTournamentId:'t',activeMatchId:null,secret:'never expose'};
+  assert.deepEqual(await (await req(null,'public')).json(),[]);
+  assert.equal((await req(null,'publications','POST',{data})).status,401);
+  const pub=await (await req(0,'publications','POST',{data})).json();assert.ok(pub.slug);
+  const view=await (await req(null,'public/'+pub.slug)).json();assert.equal(view.name,'Public league');assert.deepEqual(view.teams,['Alpha']);assert.doesNotMatch(JSON.stringify(view),/private|never expose|owner0|Private Player/);
+  assert.equal((await (await req(null,'public')).json()).length,1);
+  assert.deepEqual(await (await req(1,'publications')).json(),[]);
+  assert.equal((await req(1,'publications','DELETE',{tournamentId:'t'})).status,200);assert.equal((await req(null,'public/'+pub.slug)).status,200);
+  assert.equal((await req(0,'publications','PUT',{data,updatedAt:pub.updated_at})).status,200);
+  assert.equal((await req(0,'publications','PUT',{data,updatedAt:pub.updated_at})).status,409);
+  sql.prepare("UPDATE accounts SET status='suspended' WHERE sub='owner0'").run();assert.equal((await req(null,'public/'+pub.slug)).status,404);
+  sql.prepare("UPDATE accounts SET status='approved' WHERE sub='owner0'").run();assert.equal((await req(0,'publications','DELETE',{tournamentId:'t'})).status,200);
+  assert.equal((await req(null,'public/'+pub.slug)).status,404);assert.equal((await req(0,'publications','PUT',{data,updatedAt:pub.updated_at})).status,409);
+  const again=await (await req(0,'publications','POST',{data})).json();assert.equal(again.slug,pub.slug);
 });
