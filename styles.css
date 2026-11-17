@@ -214,3 +214,6 @@ body.display-mode{background:#071424;color:#fff}body.display-mode #adminApp{disp
 #adminApp .summary-cards{display:none}
 }
 @media(prefers-reduced-motion:reduce){#adminApp *{animation:none!important;transition:none!important}}
+
+/* Designer attribution across organizer, public and display views. */
+.creator-credit{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px 20px;margin-top:18px;padding-top:16px;border-top:1px solid #81999d35;font-size:11px;line-height:1.7;letter-spacing:0;text-transform:none;width:100%}.creator-credit strong{font-weight:800}.creator-credit nav{display:flex;gap:16px}.creator-credit a{color:inherit;font-weight:750;text-decoration:none;white-space:nowrap}.creator-credit a:hover{text-decoration:underline}.creator-credit a:focus-visible{outline:2px solid currentColor;outline-offset:4px}.display-footer{flex-wrap:wrap}.display-footer .creator-credit{font-size:clamp(10px,1vw,14px)}
