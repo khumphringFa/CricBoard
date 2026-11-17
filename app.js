@@ -32,8 +32,8 @@ const localId = query.get("local");
 const spectator = Boolean(remoteId || localId);
 
 function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(store)); cloud?.changed(); publicationChanged(); centralChanged(); }
-  catch { notify("Browser storage is unavailable. Scores may not be saved."); }
+  try { localStorage.setItem(KEY, JSON.stringify(store)); if($("localSaveState"))$("localSaveState").textContent="Saved locally · "+new Date().toLocaleTimeString(); cloud?.changed(); publicationChanged(); centralChanged(); }
+  catch { if($("localSaveState"))$("localSaveState").textContent="Local save failed — keep this page open"; notify("Browser storage is unavailable. Scores may not be saved."); }
 }
 function notify(message) {
   const node = $("toast");
@@ -71,6 +71,9 @@ function mobileView(view) {
   if (matchMedia("(max-width: 750px)").matches) window.scrollTo(0,0);
 }
 function initMobileUI() {
+  const syncSource=$("centralStatus"), syncTarget=$("workspaceSync");
+  const syncUpdate=()=>{syncTarget.textContent=syncSource.textContent;};
+  new MutationObserver(syncUpdate).observe(syncSource,{childList:true,subtree:true,characterData:true});syncUpdate();
   const indicator = $("mobileNetwork");
   const refresh = () => { indicator.textContent = navigator.onLine ? "Online" : "Offline"; indicator.classList.toggle("offline", !navigator.onLine); };
   refresh(); window.addEventListener("online", refresh); window.addEventListener("offline", refresh);
@@ -109,7 +112,8 @@ function renderDashboard(t, ts, ms) {
   const players=(store.players||[]).filter(p=>p.tournamentId===t.id).length;
   const progress=ms.length?Math.round(done/ms.length*100):0;
   const featured=live[0] || current() || ms.find(m=>m.status==="scheduled") || ms[0];
-  const matchRow=m=>'<button class="overview-match" type="button" data-match="'+esc(m.id)+'"><span class="match-monogram">'+esc(nameOf(m.teamA).slice(0,2).toUpperCase())+'</span><span><strong>'+esc(nameOf(m.teamA))+' <small>vs</small> '+esc(nameOf(m.teamB))+'</strong><small>'+esc(m.label||"Tournament fixture")+'</small></span><span class="match-status '+esc(m.status)+'">'+esc(statusLabel(m.status))+' ↗</span></button>';
+  const crease=m=>{if(!m.playerMode||!m.innings.length)return "";const inn=m.innings.at(-1),card=inningsScorecard(m,inn),l=inn.lineup||{};const batter=id=>{const p=card.batting.find(p=>p.id===id);return p?esc(p.name)+" "+p.runs+" ("+p.balls+")": "Awaiting selection";};const bowler=card.bowling.find(p=>p.id===l.bowler);return '<small class="overview-crease">Batting: '+batter(l.striker)+' * · '+batter(l.nonStriker)+'<br>Bowling: '+(bowler?esc(bowler.name)+" "+bowler.wickets+"/"+bowler.runs+" ("+bowler.overs+")":"Awaiting selection")+'</small>';};
+  const matchRow=m=>'<button class="overview-match" type="button" data-match="'+esc(m.id)+'"><span class="match-monogram">'+esc(nameOf(m.teamA).slice(0,2).toUpperCase())+'</span><span><strong>'+esc(nameOf(m.teamA))+' <small>vs</small> '+esc(nameOf(m.teamB))+'</strong><small>'+esc((m.label||"Tournament fixture")+(m.innings.length?" · "+m.innings.at(-1).runs+"/"+m.innings.at(-1).wickets+" · "+oversText(m.innings.at(-1).balls)+" overs":""))+'</small>'+crease(m)+'</span><span class="match-status '+esc(m.status)+'">'+esc(statusLabel(m.status))+' ↗</span></button>';
   $("dashboardOverview").innerHTML=
     '<div class="overview-hero"><div class="hero-copy"><span class="hero-eyebrow"><span class="hero-dot"></span> YOUR TOURNAMENT. IN FOCUS.</span><h2>'+esc(t.name)+'</h2><p>From the first ball to the final celebration.<br>Everything you need to run the game.</p><div class="hero-actions"><button class="btn btn-primary" data-mobile-tab="score">Open match center ↗</button><button class="btn hero-secondary" data-mobile-tab="fixtures">+ Create fixture</button></div></div><div class="pitch-art" aria-hidden="true"><div class="pitch-circle"></div><div class="pitch-strip"><i></i><i></i></div><div class="cricket-ball"></div><span>THE GAME STARTS HERE</span></div></div>'+
     '<div class="overview-metrics">'+[[ts.length,"Registered teams","♟"],[players,"Squad players","◌"],[ms.length,"Total fixtures","⚑"],[live.length,"Matches in play","◉"]].map(([n,l,i])=>'<div class="overview-metric"><span>'+i+'</span><strong>'+n+'</strong><small>'+l+'</small></div>').join("")+'</div>'+
@@ -125,8 +129,18 @@ const squadFor = team => (store.players || []).filter(p => p.teamId === team && 
 function renderRoster() {
   options($("rosterTeam"), teams(), $("rosterTeam").value, 'Choose team');
   const roster = squadFor($("rosterTeam").value);
-  $("rosterList").innerHTML = roster.length ? roster.map((p, i) => '<div class="team-chip"><span class="counter">' + (i + 1) + '</span><span>' + esc(p.name) + '</span></div>').join('') : '<p class="hint">Choose a team and add its playing squad.</p>';
+  $("rosterList").innerHTML = roster.length ? roster.map((p, i) => '<button type="button" class="team-chip player-profile-link" data-player="'+esc(p.id)+'"><span class="team-emblem">'+esc(p.name.slice(0,2).toUpperCase())+'</span><span><strong>'+esc(p.name)+'</strong><small>'+esc(p.profile?.role||'Player')+' · View profile →</small></span></button>').join('') : '<p class="hint">Choose a team and add its playing squad.</p>';
   $("tournamentsOverview").innerHTML = store.tournaments.map(t => '<button class="match-item" data-tournament="' + esc(t.id) + '"><span class="match-item-body"><strong>' + esc(t.name) + '</strong><small>' + store.teams.filter(x => x.tournamentId === t.id).length + ' teams · ' + store.matches.filter(x => x.tournamentId === t.id).length + ' matches</small></span></button>').join('');
+}
+function openPlayerProfile(id){
+  const p=store.players.find(p=>p.id===id&&p.tournamentId===tournament()?.id);if(!p)return;
+  $("profilePlayerId").value=p.id;$("profilePlayerName").textContent=p.name;
+  $("profileTeamName").textContent=nameOf(p.teamId)+" · "+tournament().name;
+  const profile=p.profile||{};
+  for(const [field,key]of [["profileRole","role"],["profileJersey","jersey"],["profileBatting","batting"],["profileBowling","bowling"],["profileBio","bio"]])$(field).value=profile[key]||"";
+  const s=tournamentPlayerStats(matches(),tournament().id).find(s=>s.id===p.id&&s.team===p.teamId);
+  $("profileStats").innerHTML=s?'<h3>Batting · this tournament</h3>'+statsTable(["Innings","Runs","HS","SR","4s","6s"],[[s.innings,s.runs,s.highest,s.strikeRate,s.fours,s.sixes]])+'<h3>Bowling · this tournament</h3>'+statsTable(["Overs","Wickets","Runs","Best","Economy"],[[oversText(s.bowlingBalls),s.wickets,s.conceded,s.bestBowling,s.economy]]):'<p class="hint">No recorded performances yet. Player-tracked matches will appear here automatically.</p>';
+  $("playerProfileDialog").showModal();
 }
 function statsTable(headers, rows) {
   return '<div class="table-wrap"><table class="standings"><thead><tr>' + headers.map(h => '<th>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>' + rows.map(row => '<tr>' + row.map(cell => '<td>' + esc(cell) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
@@ -421,6 +435,12 @@ function bindUI() {
     store.players ||= []; store.players.push(...names.map(name => ({id:makeId(), name, teamId, tournamentId:tournament().id})));
     $("playerNames").value = ''; save(); render(); notify('Players added. New fixtures will use this squad.');
   });
+  $("closePlayerProfile").onclick=()=>$("playerProfileDialog").close();
+  $("playerProfileForm").onsubmit=event=>{
+    event.preventDefault();const p=store.players.find(p=>p.id===$("profilePlayerId").value);if(!p)return;
+    p.profile={role:$("profileRole").value,jersey:$("profileJersey").value,batting:$("profileBatting").value,bowling:$("profileBowling").value,bio:$("profileBio").value.trim()};
+    save();render();$("playerProfileDialog").close();notify("Player profile saved.");
+  };
   $("cancelWicket").onclick = () => $("dismissalDialog").close();
   $("dismissalForm").onsubmit = event => {
     event.preventDefault();
@@ -462,6 +482,8 @@ function bindUI() {
     } catch (err) { notify(err.message); }
   });
   document.addEventListener("click", e => {
+    const profileButton=e.target.closest("[data-player]");
+    if(profileButton){openPlayerProfile(profileButton.dataset.player);return;}
     const targetTournament = e.target.closest('[data-tournament]');
     if (targetTournament) { store.activeTournamentId = targetTournament.dataset.tournament; store.activeMatchId = null; save(); render(); return; }
     const fixture = e.target.closest("[data-match]");

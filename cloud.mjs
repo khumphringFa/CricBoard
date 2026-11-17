@@ -35,6 +35,14 @@ export function validateStore(input) {
     for (const p of data.players) if (!text(p.name, 60) || !teams.has(p.teamId) ||
       !data.teams.some(t => t.id === p.teamId && t.tournamentId === p.tournamentId)) fail();
   }
+  for(const p of data.players||[]){
+    const profile=p.profile;if(profile===undefined)continue;
+    if(!profile||typeof profile!=="object"||Array.isArray(profile))fail();
+    const allowed={role:["","Batter","Bowler","All-rounder","Wicketkeeper","Wicketkeeper-batter"],batting:["","Right-handed","Left-handed"],bowling:["","Right-arm pace","Left-arm pace","Right-arm medium","Left-arm medium","Off spin","Leg spin","Left-arm orthodox","Left-arm wrist spin"]};
+    for(const [key,values]of Object.entries(allowed))if(profile[key]!==undefined&&!values.includes(profile[key]))fail();
+    if(profile.jersey!==undefined&&(typeof profile.jersey!=="string"||!/^([0-9]{1,3})?$/.test(profile.jersey)))fail();
+    if(profile.bio!==undefined&&(typeof profile.bio!=="string"||profile.bio.length>240))fail();
+  }
   const teamById = new Map(data.teams.map(t => [t.id, t]));
   for (const m of data.matches) {
     if (!tournaments.has(m.tournamentId) || !teams.has(m.teamA) || !teams.has(m.teamB) || m.teamA === m.teamB ||

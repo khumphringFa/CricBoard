@@ -14,8 +14,8 @@ export function setupCentral({account,getStore,replaceStore,storage}){
   const remember=(revision,hash)=>storage.setItem(baseKey,JSON.stringify({revision,hash}));
   const schedule=()=>{dirty=true;clearTimeout(timer);if(!conflict)timer=setTimeout(sync,retryDelay);};
   async function upload(consent=false){
-    if(busy)return;busy=true;dirty=false;controls();
-    try{const data=validateStore(getStore()),hash=await fingerprint(data);if(!consent&&base().hash===hash)return;const saved=await account.api('central',consent?'POST':'PUT',{revision:remote?.revision??null,data,consent});remote={...saved,data};remember(saved.revision,hash);conflict=false;retryDelay=1800;status('Central sharing enabled · Last synced '+timestamp(saved.updatedAt));}
+    if(busy)return;busy=true;dirty=false;controls();status("Syncing tournament records…");
+    try{const data=validateStore(getStore()),hash=await fingerprint(data);if(!consent&&base().hash===hash){status("Central copy up to date · Last synced "+timestamp(remote.updatedAt));return;}const saved=await account.api('central',consent?'POST':'PUT',{revision:remote?.revision??null,data,consent});remote={...saved,data};remember(saved.revision,hash);conflict=false;retryDelay=1800;status('Central sharing enabled · Last synced '+timestamp(saved.updatedAt));}
     catch(e){if(e instanceof TypeError||e.status>=500){dirty=true;retryDelay=Math.min(60000,retryDelay*2);status('Central sync queued; local scores are safe. Retrying when the connection returns.');}else{conflict=true;status(e.message+' Local records are safe. Restore or replace the central copy.');}}
     finally{busy=false;controls();if(dirty&&!conflict)schedule();}
   }
