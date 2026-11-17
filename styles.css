@@ -219,3 +219,40 @@ body.display-mode{background:#071424;color:#fff}body.display-mode #adminApp{disp
 .creator-credit{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px 20px;margin-top:18px;padding-top:16px;border-top:1px solid #81999d35;font-size:11px;line-height:1.7;letter-spacing:0;text-transform:none;width:100%}.creator-credit strong{font-weight:800}.creator-credit nav{display:flex;gap:16px}.creator-credit a{color:inherit;font-weight:750;text-decoration:none;white-space:nowrap}.creator-credit a:hover{text-decoration:underline}.creator-credit a:focus-visible{outline:2px solid currentColor;outline-offset:4px}.display-footer{flex-wrap:wrap}.display-footer .creator-credit{font-size:clamp(10px,1vw,14px)}
 
 .workspace-save{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 20px;padding:12px 15px;background:#e9f1eb;border:1px solid #d7e4da;border-radius:10px;font-size:11px;color:#335b4b}.workspace-save button{font:inherit;color:inherit;border:0;background:transparent;text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:3px;max-width:100%;overflow-wrap:anywhere}.player-profile-link{width:100%;border:1px solid #dfe8e4;text-align:left;color:inherit;cursor:pointer;font:inherit}.player-profile-link:hover{border-color:#70a774}.player-profile-link small{display:block;font-size:10px;color:#6b8580;margin-top:4px}#playerProfileDialog .label{margin-top:14px}#profileStats h3{font-size:13px;margin-top:18px}.overview-match .overview-crease{line-height:1.8;color:#396b61;font-size:11px}@media(max-width:750px){.workspace-save{font-size:10px;padding:10px;gap:6px}.workspace-save>span{width:100%}}
+
+/* Team managers */
+#adminApp .ta-panel{border-top:1px solid #e2e9e5;padding:26px 0 8px;margin-top:24px;color:#19343e;min-width:0}
+#adminApp .ta-panel h2{font-size:24px;letter-spacing:-.5px;margin:0 0 8px}
+#adminApp .ta-panel h3{font-size:15px;margin:0 0 14px}
+#adminApp .ta-description{color:#657982;font-size:13px;line-height:1.7;margin:8px 0 18px}
+#adminApp .ta-invite{padding:20px;background:#f3f7f5;border:1px solid #dfe9e3;border-radius:14px;margin:22px 0}
+#adminApp .ta-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) auto;gap:12px;align-items:end}
+#adminApp .ta-form label,#adminApp .ta-profile label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:600;color:#4b626b;min-width:0}
+#adminApp .ta-panel .field{box-sizing:border-box;min-width:0;width:100%;background:#fff;color:#19343e}
+#adminApp .ta-invite>.ta-description{margin:12px 0 0}
+#adminApp .ta-grants{margin-bottom:28px}
+#adminApp .ta-grants>p{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 0;border-bottom:1px solid #e7eeea;font-size:13px;overflow-wrap:anywhere}
+#adminApp .ta-grants .btn{flex-shrink:0;font-size:12px}
+#adminApp .ta-managed>p{padding:20px;border:1px dashed #d7e1db;border-radius:12px;background:#fafcfb;color:#72848a;font-size:13px}
+#adminApp .ta-squad{border:1px solid #dce6df;border-radius:14px;background:#fff;overflow:hidden;margin:12px 0}
+#adminApp .ta-squad>summary{padding:18px;cursor:pointer;font-weight:700;font-size:15px;background:#f6f9f4}
+#adminApp .ta-players{padding:0 18px}
+#adminApp .ta-player{border-top:1px solid #e9eeeb}
+#adminApp .ta-player:first-child{border-top:0}
+#adminApp .ta-player>summary{cursor:pointer;padding:15px 0;font-size:14px;font-weight:600}
+#adminApp .ta-profile{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:2px 0 20px}
+#adminApp .ta-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-top:1px solid #e6eee8;background:#fafcfb}
+#adminApp .ta-actions .btn:last-child,#adminApp .ta-form>.btn{background:#d4ed7a;color:#19352b;border-color:#c3de64;font-weight:700}
+#adminApp .ta-status:empty{display:none}
+#adminApp .ta-status:not(:empty){padding:12px 16px;background:#edf5e2;border:1px solid #dbe7cb;border-radius:10px;font-size:13px;line-height:1.6}
+#adminApp .ta-reminder{font-size:12px;color:#657982;line-height:1.7;margin:20px 0}
+#adminApp .ta-reminder summary{cursor:pointer}
+#adminApp .ta-refresh{font-size:12px;margin-top:14px}
+#adminApp .ta-panel summary:focus-visible,#adminApp .ta-panel button:focus-visible{outline:3px solid #92b943;outline-offset:3px}
+@media(max-width:650px){
+#adminApp .ta-form,#adminApp .ta-profile{grid-template-columns:1fr}
+#adminApp .ta-form>.btn{width:100%}
+#adminApp .ta-invite{padding:16px}
+#adminApp .ta-grants>p{align-items:flex-start;flex-wrap:wrap}
+#adminApp .ta-panel h2{font-size:22px}
+}
