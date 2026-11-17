@@ -63,9 +63,11 @@ function options(select, values, preferred, placeholder) {
 }
 function mobileView(view) {
   const admin = $("adminApp");
-  if (!["score","teams","fixtures","stats","settings"].includes(view)) return;
+  if (!["overview","score","teams","fixtures","stats","settings"].includes(view)) return;
   admin.dataset.mobileView = view;
-  admin.querySelectorAll(".mobile-nav button").forEach(b => { if (b.dataset.mobileTab === view) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
+  const titles={overview:"Tournament overview",score:"Match center",teams:"Teams & squads",fixtures:"Fixtures",stats:"Tournament statistics",settings:"Settings & sync"};
+  admin.querySelector(".page-head h1").textContent=titles[view];
+  admin.querySelectorAll("nav [data-mobile-tab]").forEach(b => { if (b.dataset.mobileTab === view) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
   if (matchMedia("(max-width: 750px)").matches) window.scrollTo(0,0);
 }
 function initMobileUI() {
@@ -94,11 +96,26 @@ function render() {
     ["♧", ts.length, "Registered teams"], ["⚑", ms.length, "Total fixtures"], ["◉", ms.filter(m => m.status === "completed").length, "Matches completed"]
   ].map(item => '<div class="stat-card"><span class="stat-icon">' + item[0] + '</span><div><strong>' + item[1] + '</strong><span>' + item[2] + '</span></div></div>').join("");
   if (!current() && ms.length) store.activeMatchId = ms[0].id;
+  renderDashboard(t, ts, ms);
   renderMatches(ms);
   renderScore();
   renderPoints(ts, ms);
   renderShare();
   renderRoster(); renderTournamentStats(); publicationRender();
+}
+function renderDashboard(t, ts, ms) {
+  const done=ms.filter(m=>m.status==="completed").length;
+  const live=ms.filter(m=>["live","break"].includes(m.status));
+  const players=(store.players||[]).filter(p=>p.tournamentId===t.id).length;
+  const progress=ms.length?Math.round(done/ms.length*100):0;
+  const featured=live[0] || current() || ms.find(m=>m.status==="scheduled") || ms[0];
+  const matchRow=m=>'<button class="overview-match" type="button" data-match="'+esc(m.id)+'"><span class="match-monogram">'+esc(nameOf(m.teamA).slice(0,2).toUpperCase())+'</span><span><strong>'+esc(nameOf(m.teamA))+' <small>vs</small> '+esc(nameOf(m.teamB))+'</strong><small>'+esc(m.label||"Tournament fixture")+'</small></span><span class="match-status '+esc(m.status)+'">'+esc(statusLabel(m.status))+' ↗</span></button>';
+  $("dashboardOverview").innerHTML=
+    '<div class="overview-hero"><div class="hero-copy"><span class="hero-eyebrow"><span class="hero-dot"></span> YOUR TOURNAMENT. IN FOCUS.</span><h2>'+esc(t.name)+'</h2><p>From the first ball to the final celebration.<br>Everything you need to run the game.</p><div class="hero-actions"><button class="btn btn-primary" data-mobile-tab="score">Open match center ↗</button><button class="btn hero-secondary" data-mobile-tab="fixtures">+ Create fixture</button></div></div><div class="pitch-art" aria-hidden="true"><div class="pitch-circle"></div><div class="pitch-strip"><i></i><i></i></div><div class="cricket-ball"></div><span>THE GAME STARTS HERE</span></div></div>'+
+    '<div class="overview-metrics">'+[[ts.length,"Registered teams","♟"],[players,"Squad players","◌"],[ms.length,"Total fixtures","⚑"],[live.length,"Matches in play","◉"]].map(([n,l,i])=>'<div class="overview-metric"><span>'+i+'</span><strong>'+n+'</strong><small>'+l+'</small></div>').join("")+'</div>'+
+    '<div class="overview-columns"><section class="panel overview-fixtures"><div class="panel-title"><div><span class="overline">ON THE FIELD</span><h2>'+(live.length?"Match in play":"Your match center")+'</h2></div><button class="btn btn-text" data-mobile-tab="fixtures">All fixtures →</button></div>'+(featured?matchRow(featured):'<div class="overview-empty"><span>⚑</span><h3>Build your first fixture</h3><p>Add two teams, choose your overs, and get ready for the first ball.</p><button class="btn btn-outline" data-mobile-tab="teams">Add your teams →</button></div>')+(ms.length>1?'<div class="overview-recent"><span class="overline">MORE FIXTURES</span>'+ms.filter(m=>m.id!==featured?.id).slice(0,3).map(matchRow).join("")+'</div>':"")+'</section>'+
+    '<section class="panel tournament-progress"><span class="overline">TOURNAMENT PULSE</span><h2>The road to the final</h2><div class="progress-ring" style="--progress:'+progress+'"><div><strong>'+progress+'<small>%</small></strong><span>completed</span></div></div><p>'+done+' of '+ms.length+' matches completed</p><div class="pulse-legend"><span><i></i>'+live.length+' in play</span><span>'+ms.filter(m=>m.status==="scheduled").length+' upcoming</span></div><button class="btn btn-light btn-wide" data-mobile-tab="stats">Explore statistics →</button></section></div>'+
+    '<div class="overview-quick"><div><span class="overline">MAKE IT MATCH DAY</span><h2>Your next move</h2></div><button data-mobile-tab="teams"><span>♟</span><strong>Teams & squads</strong><small>Manage your players →</small></button><button data-mobile-tab="stats"><span>▥</span><strong>Player leaderboards</strong><small>Batting & bowling form →</small></button><button data-mobile-tab="settings"><span>☁</span><strong>Sync & backups</strong><small>Review your data status →</small></button></div>';
 }
 function updateBattingFirst(preferred) {
   const list = [$("teamA").value, $("teamB").value].filter(Boolean).map(id => ({id,name:nameOf(id)}));
