@@ -7,6 +7,32 @@ import {publicTournament} from './public-data.mjs';
 import {centralStore,centralSummary} from './central-data.mjs';
 import {createMatch,startMatch,selectPlayers,applyDelivery} from './engine.mjs';
 
+test('team managers can edit only assigned squads, with conflicts and revocation enforced',async()=>{
+  const sql=new DatabaseSync(':memory:');sql.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));
+  const DB={prepare:s=>{const bound=(...a)=>({first:async()=>sql.prepare(s).get(...a),run:async()=>({meta:sql.prepare(s).run(...a)}),all:async()=>({results:sql.prepare(s).all(...a)})});return {...bound(),bind:bound};}};
+  const tokens=['a'.repeat(64),'b'.repeat(64),'c'.repeat(64)];
+  for(const [i,t]of tokens.entries()){sql.prepare('INSERT INTO accounts VALUES(?,?,?,?,?)').run('u'+i,'u'+i+'@example.com','organizer','approved',1);sql.prepare('INSERT INTO sessions VALUES(?,?,?)').run(Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t))).toString('hex'),'u'+i,Date.now()+60000);}
+  const req=(i,p,m='GET',b)=>handle(new Request('https://example.com/api/'+p,{method:m,headers:{Cookie:'__Host-cricboard='+tokens[i],Origin:'https://example.com'},body:b===undefined?undefined:JSON.stringify(b)}),{DB});
+  for(const i of [0,1,2])await req(i,'terms','POST',{version:'central-required-v1',accept:true});
+  const data={tournaments:[{id:'t',name:'Cup'}],teams:[{id:'a',name:'Alpha',tournamentId:'t'},{id:'b',name:'Beta',tournamentId:'t'}],players:[{id:'p',name:'Original',teamId:'a',tournamentId:'t',profile:{role:'Batter'}}],matches:[],activeTournamentId:'t',activeMatchId:null};
+  await req(0,'central','POST',{revision:null,consent:true,data});
+  const grant={teamId:'a',email:'u1@example.com'};
+  assert.equal((await req(0,'team-access','POST',grant)).status,200);
+  const [assigned]=await (await req(1,'managed-teams')).json();
+  assert.equal(assigned.players[0].profile.role,'Batter');assert.equal(assigned.team.id,'a');assert.equal(assigned.matches,undefined);
+  const edit={owner:'u0',teamId:'a',revision:assigned.revision,players:[{...assigned.players[0],name:'Updated',profile:{role:'Bowler'}}],matches:[]};
+  assert.equal((await req(2,'managed-teams','PUT',edit)).status,403);
+  assert.equal((await req(1,'managed-teams','PUT',{...edit,teamId:'b'})).status,403);
+  assert.equal((await req(1,'managed-teams','PUT',{...edit,players:[]})).status,400);
+  assert.equal((await req(1,'managed-teams','PUT',edit)).status,200);
+  assert.equal((await req(1,'managed-teams','PUT',edit)).status,409);
+  const central=await (await req(0,'central')).json();assert.equal(central.data.players[0].name,'Updated');assert.equal(central.data.players[0].profile.role,'Bowler');assert.deepEqual(central.data.teams,data.teams);
+  assert.equal((await req(0,'central','PUT',{revision:assigned.revision,data})).status,409);
+  await req(0,'team-access','DELETE',grant);
+  assert.deepEqual(await (await req(1,'managed-teams')).json(),[]);
+  assert.equal((await req(1,'managed-teams','PUT',{...edit,revision:central.revision})).status,403);
+});
+
 test('public scorecards are opt-in and derive scores without exposing raw deliveries',()=>{
   const squads={A:[{id:'A1',name:'Batter one'},{id:'A2',name:'Batter two'}],B:[{id:'B1',name:'Bowler one'},{id:'B2',name:'Bowler two'}]};
   let m=startMatch(createMatch({tournamentId:'t',teamA:'A',teamB:'B',battingFirst:'A',overs:2,squads}));
@@ -136,3 +162,4 @@ test('central backup retains cricket deliveries and computes global tournament l
   const clean=centralStore({tournaments:[{id:'t',name:'Cup'}],teams:[{id:'A',name:'Alpha',tournamentId:'t'},{id:'B',name:'Beta',tournamentId:'t'}],matches:[m],activeTournamentId:'t',activeMatchId:m.id});
   assert.equal(clean.matches[0].innings[0].deliveries[0].runs,4);const summary=centralSummary(clean);assert.equal(summary.batting[0].runs,4);assert.equal(summary.bowling[0].runs,4);assert.equal(summary.live,1);
 });
+

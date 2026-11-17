@@ -182,3 +182,14 @@ Configure the four repository Actions secrets ANDROID_KEYSTORE_BASE64, ANDROID_K
 The existing scoring engine and interface are packaged in the APK and rendered in an isolated Android WebView, not loaded as a website. Native Credential Manager and Google AuthorizationClient handle sign-in and private Drive permission. Cloudflare APIs remain on the deployed HTTPS origin, retaining server-side identity verification, terms and revision protection. First login and account approval require internet; a recently verified approved account can reopen local scoring offline for up to 24 hours. Unsynced local data persists in the app. Sync and Drive renewal retry while the app is running/resumed, not as guaranteed background work after force-stop. Existing browser data is separate: use central restore or import a backup on the APK; do not overwrite a newer central record. On Drive consent, automatic backup is enabled, but conflicts still require review.
 
 **Required Google setup:** In the same Google Cloud project as the existing Web OAuth client, create an Android OAuth client for package `com.khumphringfa.cricboard` with the release certificate SHA-1. Obtain the public SHA-1 from `keytool -list -v -keystore cricboard-release.jks -alias cricboard` or the previous signed APK's apksigner output. Register the debug SHA-1 separately if testing debug APK authentication. Enable Drive API and the consent screen's appropriate scopes. Do not share signing passwords or client secrets. Native sign-in/Drive requires real device verification before publishing. Build: `npm install --prefix android --no-save --ignore-scripts peerjs@1.5.5`, then run the Android workflow. Version 1.1.0 uses versionCode 2 and the existing release signing key.
+
+
+## Team managers
+
+1. The manager opens the dashboard, signs in with Google, and receives administrator approval.
+2. The tournament owner synchronizes their tournament centrally, then uses **Team manager access** at the bottom of the dashboard to select a team and enter the manager's Google email.
+3. The manager refreshes the dashboard and opens **Teams assigned to me** to add players or edit player names, role, jersey, styles and introduction. Existing players cannot be removed because match history must be retained.
+4. Saves are online and update the owner's central record. **After manager edits, the owner must use Settings → Restore central copy before scoring or syncing again.** Concurrent updates are rejected; refresh and reconcile first. Manager edits do not automatically republish public scorecards or rewrite completed match squads.
+5. The owner can revoke access immediately in the same panel. Managers cannot edit scores, fixtures, another team, or access the owner's private Drive backups. Each manager retains a separate organizer account.
+
+Player profiles are retained in central synchronization as well as private backups.

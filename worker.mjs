@@ -102,6 +102,51 @@ export async function handle(request,env) {
       }
       if(account.role!=='admin'&&accepted?.version!==termsVersion)return json({error:'Organizer terms acceptance required'},403);
     }
+    if(path==='/api/team-access'||path==='/api/managed-teams'){
+      await db.prepare(centralSchema).run();
+      await db.prepare("CREATE TABLE IF NOT EXISTS team_access (owner TEXT NOT NULL, team_id TEXT NOT NULL, manager TEXT NOT NULL, PRIMARY KEY(owner,team_id,manager))").run();
+      if(path==='/api/team-access'){
+        if(request.method==='GET')return json((await db.prepare('SELECT team_id,email FROM team_access JOIN accounts ON accounts.sub=manager WHERE owner=?').bind(account.sub).all()).results);
+        const b=await request.json();
+        if(typeof b.teamId!=='string'||typeof b.email!=='string')return json({error:'Choose a team and manager email'},400);
+        const manager=await db.prepare("SELECT sub FROM accounts WHERE lower(email)=? AND status='approved'").bind(b.email.trim().toLowerCase()).first();
+        if(!manager||manager.sub===account.sub)return json({error:'Manager must first sign in and be approved by the administrator'},400);
+        const row=await db.prepare('SELECT data FROM central_records WHERE sub=? AND enabled=1').bind(account.sub).first();
+        if(!row||!JSON.parse(row.data).teams.some(t=>t.id===b.teamId))return json({error:'Sync this team centrally before assigning access'},400);
+        if(request.method==='POST')await db.prepare('INSERT OR IGNORE INTO team_access(owner,team_id,manager) VALUES(?,?,?)').bind(account.sub,b.teamId,manager.sub).run();
+        else if(request.method==='DELETE')await db.prepare('DELETE FROM team_access WHERE owner=? AND team_id=? AND manager=?').bind(account.sub,b.teamId,manager.sub).run();
+        else return json({error:'Method not allowed'},405);
+        return json({ok:true});
+      }
+      if(request.method==='GET'){
+        const rows=(await db.prepare("SELECT c.sub,c.revision,c.data,x.team_id FROM team_access x JOIN central_records c ON c.sub=x.owner JOIN accounts a ON a.sub=c.sub WHERE x.manager=? AND c.enabled=1 AND a.status='approved'").bind(account.sub).all()).results;
+        return json(rows.flatMap(r=>{const d=JSON.parse(r.data),team=d.teams.find(t=>t.id===r.team_id);return team?[{owner:r.sub,revision:r.revision,team:{id:team.id,name:team.name,tournamentId:team.tournamentId},players:(d.players||[]).filter(p=>p.teamId===team.id&&p.tournamentId===team.tournamentId)}]:[];}));
+      }
+      if(request.method==='PUT'){
+        const raw=await request.text();if(raw.length>100000)return json({error:'Squad too large'},413);
+        const b=JSON.parse(raw);
+        const grant=await db.prepare("SELECT c.revision,c.data FROM team_access x JOIN central_records c ON c.sub=x.owner JOIN accounts a ON a.sub=c.sub WHERE x.owner=? AND x.team_id=? AND x.manager=? AND c.enabled=1 AND a.status='approved'").bind(b.owner,b.teamId,account.sub).first();
+        if(!grant)return json({error:'Team access denied'},403);
+        if(grant.revision!==b.revision)return json({error:'Team records changed. Reload before saving.'},409);
+        const data=JSON.parse(grant.data),team=data.teams.find(t=>t.id===b.teamId);
+        if(!team)return json({error:'Team no longer exists'},404);
+        const old=(data.players||[]).filter(p=>p.teamId===team.id&&p.tournamentId===team.tournamentId);
+        if(!Array.isArray(b.players)||b.players.length>100)return json({error:'Invalid squad'},400);
+        const ids=new Set();
+        const players=b.players.map(p=>{
+          if(typeof p.id!=='string'||ids.has(p.id)||(!old.some(o=>o.id===p.id)&&(data.players||[]).some(o=>o.id===p.id)))throw Error('Invalid player');
+          ids.add(p.id);return {id:p.id,name:p.name,teamId:team.id,tournamentId:team.tournamentId,...(p.profile?{profile:p.profile}:{})};
+        });
+        if(old.some(p=>!ids.has(p.id)))return json({error:'Existing players must be retained to preserve match history'},400);
+        data.players=[...(data.players||[]).filter(p=>!(p.teamId===team.id&&p.tournamentId===team.tournamentId)),...players];
+        let clean;try{clean=centralStore(data);}catch{return json({error:'Invalid player details'},400);}
+        const revision=crypto.randomUUID();
+        const result=await db.prepare('UPDATE central_records SET revision=?,updated_at=?,data=?,summary=? WHERE sub=? AND revision=? AND EXISTS (SELECT 1 FROM team_access WHERE owner=? AND team_id=? AND manager=?)').bind(revision,Date.now(),JSON.stringify(clean),JSON.stringify(centralSummary(clean)),b.owner,b.revision,b.owner,b.teamId,account.sub).run();
+        if(!result.meta.changes)return json({error:'Access or records changed. Reload before saving.'},409);
+        return json({revision});
+      }
+      return json({error:'Method not allowed'},405);
+    }
     if(path==='/api/central'){
       await db.prepare(centralSchema).run();
       if(request.method==='GET'){
@@ -175,3 +220,4 @@ export async function handle(request,env) {
   } catch {return json({error:'Account service temporarily unavailable'},503);}
 }
 export default {fetch:handle};
+
