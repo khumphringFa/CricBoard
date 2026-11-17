@@ -256,3 +256,30 @@ body.display-mode{background:#071424;color:#fff}body.display-mode #adminApp{disp
 #adminApp .ta-grants>p{align-items:flex-start;flex-wrap:wrap}
 #adminApp .ta-panel h2{font-size:22px}
 }
+
+/* Let the Teams workspace grow beyond the former sidebar flex basis. */
+#adminApp[data-mobile-view=teams] .sidebar{
+  flex:1 1 0;
+  min-width:0;
+  width:auto;
+  max-width:1440px;
+  margin:28px 32px;
+  padding:28px;
+  box-shadow:none;
+}
+#adminApp[data-mobile-view=teams] .sidebar>*{min-width:0}
+@media(min-width:1100px){
+  #adminApp[data-mobile-view=teams] .sidebar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:26px 32px;align-content:start;align-items:start}
+  #adminApp[data-mobile-view=teams] .sidebar>.side-head{grid-column:1/-1}
+  #adminApp[data-mobile-view=teams] .sidebar>.side-section:nth-child(2){grid-column:1;grid-row:2}
+  #adminApp[data-mobile-view=teams] .sidebar>.side-section:nth-child(3){grid-column:1;grid-row:3}
+  #adminApp[data-mobile-view=teams] .sidebar>.side-section[aria-label="Team players"]{grid-column:2;grid-row:2/span 2;background:#f7faf9;border:1px solid #e2ebe6;border-radius:14px;padding:22px}
+  #adminApp[data-mobile-view=teams] .sidebar>details,
+  #adminApp[data-mobile-view=teams] .sidebar>.sidebar-note,
+  #adminApp[data-mobile-view=teams] .sidebar>.ta-panel{grid-column:1/-1}
+  #adminApp[data-mobile-view=teams] .ta-panel{margin-top:0}
+}
+@media(max-width:750px){
+  #adminApp[data-mobile-view=teams] .sidebar{display:block;width:auto;max-width:none;margin:18px 14px;padding:20px 16px;flex-basis:auto}
+  #adminApp[data-mobile-view=teams] .sidebar>.side-section{margin-top:22px}
+}
